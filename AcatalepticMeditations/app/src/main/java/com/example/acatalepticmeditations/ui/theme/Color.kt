@@ -9,3 +9,12 @@ val Pink80 = Color(0xFFEFB8C8)
 val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
+
+// Futuristic Dark Theme
+val DarkBackground = Color(0xFF0D0D1A)
+val DarkSurface = Color(0xFF1A1A2E)
+val PrimaryCyber = Color(0xFF00E5FF) // A bright cyan
+val SecondaryCyber = Color(0xFFE94560) // A hot pink
+val OnPrimaryCyber = Color.Black
+val OnSecondaryCyber = Color.Black
+val TextColor = Color.White

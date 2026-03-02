@@ -4,54 +4,35 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import com.example.acatalepticmeditations.data.AppDatabase
+import com.example.acatalepticmeditations.ui.CalendarScreen
+import com.example.acatalepticmeditations.ui.JournalViewModel
+import com.example.acatalepticmeditations.ui.JournalViewModelFactory
 import com.example.acatalepticmeditations.ui.theme.AcatalepticMeditationsTheme
 
 class MainActivity : ComponentActivity() {
+    private val database by lazy { AppDatabase.getDatabase(this) }
+    private val viewModel: JournalViewModel by viewModels {
+        JournalViewModelFactory(database.journalEntryDao())
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             AcatalepticMeditationsTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Friend",
-                        modifier = Modifier.padding(innerPadding)
+                    CalendarScreen(
+                        modifier = Modifier.padding(innerPadding),
+                        viewModel = viewModel
                     )
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(text = "Hello $name!")
-            Text(text = "Welcome to Acataleptic Meditations!")
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    AcatalepticMeditationsTheme {
-        Greeting("Android")
     }
 }
