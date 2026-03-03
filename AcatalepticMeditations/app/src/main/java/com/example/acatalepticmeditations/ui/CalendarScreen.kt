@@ -9,6 +9,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -25,7 +28,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +74,7 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
     var showDialog by remember { mutableStateOf(false) }
     var showLinksDialog by remember { mutableStateOf(false) }
     var showRippleGame by remember { mutableStateOf(false) }
+    var showFullScreenImage by remember { mutableStateOf<String?>(null) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     var selectedMonth by remember { mutableStateOf(LocalDate.now().month) }
     var selectedYear by remember { mutableStateOf(LocalDate.now().year) }
@@ -76,6 +83,7 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
     val journalEntries by viewModel.getEntriesForDate(selectedDate ?: LocalDate.now()).collectAsState(initial = emptyList())
     val searchResults by viewModel.searchEntries(searchQuery).collectAsState(initial = emptyList())
     val allScores by viewModel.getAllScores().collectAsState(initial = emptyList())
+    val totalAppLifeScore = allScores.sumOf { it.totalScore }
     val context = LocalContext.current
 
     if (showDialog && selectedDate != null) {
@@ -106,6 +114,13 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
         ) {
             RippleGame(viewModel = viewModel, onExit = { showRippleGame = false })
         }
+    }
+
+    if (showFullScreenImage != null) {
+        FullScreenImageViewer(
+            imageUri = showFullScreenImage!!,
+            onDismiss = { showFullScreenImage = null }
+        )
     }
 
     Column(modifier = modifier.fillMaxSize().background(DarkBackground).padding(16.dp)) {
@@ -233,7 +248,12 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                                             AsyncImage(
                                                 model = entry.imageUri,
                                                 contentDescription = null,
-                                                modifier = Modifier.fillMaxWidth().height(200.dp).padding(top = 8.dp).clip(RoundedCornerShape(8.dp)),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(200.dp)
+                                                    .padding(top = 8.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .clickable { showFullScreenImage = entry.imageUri },
                                                 contentScale = ContentScale.Crop
                                             )
                                         }
@@ -273,6 +293,18 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                         }
                     }
                 }
+                
+                item {
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Text(
+                        text = "Total App Life Score: $totalAppLifeScore",
+                        color = PrimaryCyber,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
+                    )
+                }
             }
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 16.dp)) {
@@ -292,6 +324,52 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun FullScreenImageViewer(imageUri: String, onDismiss: () -> Unit) {
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    val state = rememberTransformableState { zoomChange, offsetChange, _ ->
+        scale *= zoomChange
+        offset += offsetChange
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = imageUri,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = maxOf(1f, scale),
+                        scaleY = maxOf(1f, scale),
+                        translationX = offset.x,
+                        translationY = offset.y
+                    )
+                    .transformable(state = state)
+                    .pointerInput(Unit) {
+                        // detectTapGestures { onDismiss() } // Optional
+                    },
+                contentScale = ContentScale.Fit
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
             }
         }
     }
@@ -409,14 +487,22 @@ fun JournalEntryDialog(date: LocalDate, entryToEdit: JournalEntry?, onDismiss: (
                 
                 // Image Section
                 if (imageUri != null) {
-                    AsyncImage(
-                        model = imageUri,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop
-                    )
-                    TextButton(onClick = { imageUri = null }) {
-                        Text("Remove Image", color = SecondaryCyber)
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        AsyncImage(
+                            model = imageUri,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        IconButton(
+                            onClick = { imageUri = null },
+                            modifier = Modifier.align(Alignment.TopEnd).background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        ) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Remove Image", tint = Color.White)
+                        }
                     }
                 }
                 Button(

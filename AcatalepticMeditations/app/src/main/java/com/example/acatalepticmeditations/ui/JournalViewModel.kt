@@ -7,6 +7,7 @@ import com.example.acatalepticmeditations.data.DailyScore
 import com.example.acatalepticmeditations.data.JournalEntry
 import com.example.acatalepticmeditations.data.JournalEntryDao
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -43,9 +44,26 @@ class JournalViewModel(private val dao: JournalEntryDao) : ViewModel() {
         return dao.getScoreForDate(date)
     }
 
-    fun updateHighScore(date: LocalDate, newScore: Int) {
+    fun incrementScore(date: LocalDate) {
         viewModelScope.launch {
-            dao.insertScore(DailyScore(date, newScore))
+            val currentScore = dao.getScoreForDate(date).first() ?: DailyScore(date, 0, 0)
+            val newTotal = currentScore.totalScore + 1
+            // High score is the max of current high score and current game session if we were tracking it, 
+            // but the prompt says "high score" and "total". 
+            // Let's assume high score is the most taps in a single day or session? 
+            // Actually, usually high score is best session. 
+            // But let's just keep it as "highest total ever reached in a day" for now if not specified.
+            // Wait, the previous logic was: if (score > high) updateHighScore.
+            // Let's stick to updating high score when current session score > daily high score.
+        }
+    }
+
+    fun updateScores(date: LocalDate, sessionScore: Int) {
+        viewModelScope.launch {
+            val currentDaily = dao.getScoreForDate(date).first() ?: DailyScore(date, 0, 0)
+            val newHigh = maxOf(currentDaily.highScore, sessionScore)
+            val newTotal = currentDaily.totalScore + 1 // This is called every tap
+            dao.insertScore(DailyScore(date, newHigh, newTotal))
         }
     }
 

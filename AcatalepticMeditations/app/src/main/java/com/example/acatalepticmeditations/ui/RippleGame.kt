@@ -49,7 +49,7 @@ fun RippleGame(
     val scope = rememberCoroutineScope()
     var score by remember { mutableIntStateOf(0) }
     var dotPosition by remember { mutableStateOf<Offset?>(null) }
-    var isDotVisible by remember { mutableStateOf(true) }
+    var isDotVisible by remember { mutableStateOf(false) }
     val ripples = remember { mutableStateListOf<Ripple>() }
     val today = LocalDate.now()
     val dailyScore by viewModel.getScoreForDate(today).collectAsState(initial = null)
@@ -60,25 +60,17 @@ fun RippleGame(
     val mediaPlayer = remember {
         val songNames = listOf("chasm", "desert_oasis", "tranquil_sea", "frozen_caverns")
         val songName = songNames.random()
-        
-        // This looks for files directly in res/raw (e.g. res/raw/chasm.mp3)
         val resId = context.resources.getIdentifier(songName, "raw", context.packageName)
-        
         if (resId != 0) {
-            MediaPlayer.create(context, resId).apply { 
-                isLooping = true 
-            }
+            MediaPlayer.create(context, resId).apply { isLooping = true }
         } else {
-            Log.e("RippleGame", "Could not find music resource: $songName. Ensure files are directly in res/raw/")
+            Log.e("RippleGame", "Could not find music resource: $songName")
             null
         }
     }
 
-    // Start/Stop music with the game lifecycle and handle pause/play
     DisposableEffect(Unit) {
-        if (isMusicPlaying) {
-            mediaPlayer?.start()
-        }
+        if (isMusicPlaying) mediaPlayer?.start()
         onDispose {
             mediaPlayer?.stop()
             mediaPlayer?.release()
@@ -86,23 +78,19 @@ fun RippleGame(
     }
 
     LaunchedEffect(isMusicPlaying) {
-        if (isMusicPlaying) {
-            mediaPlayer?.start()
-        } else {
-            mediaPlayer?.pause()
-        }
+        if (isMusicPlaying) mediaPlayer?.start() else mediaPlayer?.pause()
     }
 
     // Dot Fade Animation
     val dotAlpha by animateFloatAsState(
         targetValue = if (isDotVisible) 1f else 0f,
-        animationSpec = tween(durationMillis = 300),
+        animationSpec = tween(durationMillis = 250),
         label = "dotAlpha"
     )
 
     LaunchedEffect(score) {
-        if (score > (dailyScore?.highScore ?: 0)) {
-            viewModel.updateHighScore(today, score)
+        if (score > 0) {
+            viewModel.updateScores(today, score)
         }
     }
 
@@ -121,10 +109,15 @@ fun RippleGame(
     ) {
         val maxWidth = constraints.maxWidth.toFloat()
         val maxHeight = constraints.maxHeight.toFloat()
-        val topReservedHeight = 120f * density // Space reserved for score and header
+        val topReservedHeight = 140f * density 
 
-        if (dotPosition == null) {
-            dotPosition = Offset(maxWidth / 2f, (maxHeight + topReservedHeight) / 2f)
+        // Initialize dot position
+        LaunchedEffect(maxWidth, maxHeight) {
+            if (dotPosition == null) {
+                dotPosition = Offset(maxWidth / 2f, (maxHeight + topReservedHeight) / 2f)
+                delay(250)
+                isDotVisible = true
+            }
         }
 
         val currentDotPosition = dotPosition ?: Offset(maxWidth / 2f, (maxHeight + topReservedHeight) / 2f)
@@ -143,22 +136,20 @@ fun RippleGame(
                             ripples.add(Ripple(currentDotPosition, startColor, targetColor, System.currentTimeMillis()))
                             score++
                             
-                            delay(800) // 300ms for fade-out + 500ms wait
+                            delay(250 + 500) // Fade out (250) + Wait (500)
                             
                             dotPosition = Offset(
                                 Random.nextFloat() * (maxWidth - 120f * density) + 60f * density,
-                                Random.nextFloat() * (maxHeight - topReservedHeight - 60f * density) + topReservedHeight + 30f * density
+                                Random.nextFloat() * (maxHeight - topReservedHeight - 100f * density) + topReservedHeight + 50f * density
                             )
                             isDotVisible = true
                         }
                     }
                 }
             }) {
+            val _t = ticker
             val currentTime = System.currentTimeMillis()
-            val _t = ticker // Trigger recomposition
-
             ripples.removeIf { (currentTime - it.startTime) > it.duration }
-            
             ripples.forEach { ripple ->
                 val progress = (currentTime - ripple.startTime).toFloat() / ripple.duration
                 for (i in 0 until 3) {
@@ -179,18 +170,19 @@ fun RippleGame(
             }
         }
 
-        // The Dot with animation
-        Box(
-            modifier = Modifier
-                .offset(
-                    x = (currentDotPosition.x / density).dp - 25.dp,
-                    y = (currentDotPosition.y / density).dp - 25.dp
-                )
-                .graphicsLayer { alpha = dotAlpha }
-                .size(50.dp)
-                .clip(CircleShape)
-                .background(PrimaryCyber)
-        )
+        if (dotPosition != null) {
+            Box(
+                modifier = Modifier
+                    .offset(
+                        x = (currentDotPosition.x / density).dp - 25.dp,
+                        y = (currentDotPosition.y / density).dp - 25.dp
+                    )
+                    .graphicsLayer { alpha = dotAlpha }
+                    .size(50.dp)
+                    .clip(CircleShape)
+                    .background(PrimaryCyber)
+            )
+        }
 
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -217,6 +209,7 @@ fun RippleGame(
             }
             dailyScore?.let {
                 Text(text = "Daily High: ${it.highScore}", color = PrimaryCyber.copy(alpha = 0.7f), fontSize = 16.sp)
+                Text(text = "Daily Total: ${it.totalScore}", color = PrimaryCyber.copy(alpha = 0.5f), fontSize = 14.sp)
             }
         }
     }
