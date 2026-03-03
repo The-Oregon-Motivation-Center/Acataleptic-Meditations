@@ -49,9 +49,12 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
 import java.time.Month
 import java.time.YearMonth
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -76,7 +79,7 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
     var showLinksDialog by remember { mutableStateOf(false) }
     var showRippleGame by remember { mutableStateOf(false) }
     var showFullScreenImage by remember { mutableStateOf<String?>(null) }
-    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+    var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
     var selectedMonth by remember { mutableStateOf(LocalDate.now().month) }
     var selectedYear by remember { mutableStateOf(LocalDate.now().year) }
     var searchQuery by remember { mutableStateOf("") }
@@ -101,12 +104,12 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
             date = entryToEdit?.date ?: selectedDate ?: LocalDate.now(),
             entryToEdit = entryToEdit,
             onDismiss = { showDialog = false; entryToEdit = null },
-            onSave = { entry, imageUri, docUri, docName, newDate ->
+            onSave = { text, imageUri, docUri, docName, newDate ->
                 val finalDate = newDate ?: entryToEdit?.date ?: selectedDate ?: LocalDate.now()
                 if (entryToEdit != null) {
                     viewModel.updateJournalEntry(entryToEdit!!.copy(
                         date = finalDate,
-                        text = entry, 
+                        text = text, 
                         imageUri = imageUri, 
                         documentUri = docUri, 
                         documentName = docName
@@ -114,12 +117,18 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                 } else {
                     viewModel.addJournalEntry(JournalEntry(
                         date = finalDate, 
-                        text = entry, 
+                        text = text, 
                         imageUri = imageUri, 
                         documentUri = docUri, 
                         documentName = docName
                     ))
                 }
+                
+                // Switch calendar view to the new date
+                selectedDate = finalDate
+                selectedMonth = finalDate.month
+                selectedYear = finalDate.year
+                
                 showDialog = false
                 entryToEdit = null
             }
@@ -246,7 +255,6 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                                         color = TextColor,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    // Sort order toggle for current date
                                     IconButton(onClick = { isDescending = !isDescending }, modifier = Modifier.size(24.dp)) {
                                         Icon(
                                             imageVector = if (isDescending) Icons.Default.VerticalAlignBottom else Icons.Default.VerticalAlignTop,
@@ -323,7 +331,7 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                             JournalEntryCard(
                                 entry = entry,
                                 showDate = true,
-                                onEdit = { entryToEdit = it; showDialog = true },
+                                onEdit = { entryToEdit = it; selectedDate = it.date; showDialog = true },
                                 onDelete = { viewModel.deleteJournalEntry(it) },
                                 onImageClick = { showFullScreenImage = it }
                             )
@@ -581,20 +589,27 @@ fun JournalEntryDialog(date: LocalDate, entryToEdit: JournalEntry?, onDismiss: (
     }
 
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = entryDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-        )
+        // Convert LocalDate to UTC Millis for DatePicker
+        val initialMillis = entryDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let {
-                        entryDate = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                        // Convert UTC Millis back to LocalDate accurately
+                        entryDate = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
                     }
                     showDatePicker = false
                 }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
             }
-        ) { DatePicker(state = datePickerState) }
+        ) {
+            DatePicker(state = datePickerState)
+        }
     }
 
     AlertDialog(
