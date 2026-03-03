@@ -40,8 +40,12 @@ android {
     }
 }
 
-dependencies {
+// Corrected KSP configuration location
+ksp {
+    arg("room.schemaLocation", "${projectDir}/schemas")
+}
 
+dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -56,7 +60,6 @@ dependencies {
     ksp("androidx.room:room-compiler:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
     implementation("io.coil-kt:coil-compose:2.7.0")
-    //implementation(libs.androidx.appcompat) // Add AppCompatActivity support
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

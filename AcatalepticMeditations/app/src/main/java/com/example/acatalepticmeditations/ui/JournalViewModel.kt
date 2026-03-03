@@ -21,6 +21,10 @@ class JournalViewModel(private val dao: JournalEntryDao) : ViewModel() {
         return dao.searchEntries(query)
     }
 
+    fun getAllEntries(descending: Boolean = true): Flow<List<JournalEntry>> {
+        return if (descending) dao.getAllEntriesDescending() else dao.getAllEntriesAscending()
+    }
+
     fun addJournalEntry(entry: JournalEntry) {
         viewModelScope.launch {
             dao.insert(entry)
@@ -44,25 +48,11 @@ class JournalViewModel(private val dao: JournalEntryDao) : ViewModel() {
         return dao.getScoreForDate(date)
     }
 
-    fun incrementScore(date: LocalDate) {
-        viewModelScope.launch {
-            val currentScore = dao.getScoreForDate(date).first() ?: DailyScore(date, 0, 0)
-            val newTotal = currentScore.totalScore + 1
-            // High score is the max of current high score and current game session if we were tracking it, 
-            // but the prompt says "high score" and "total". 
-            // Let's assume high score is the most taps in a single day or session? 
-            // Actually, usually high score is best session. 
-            // But let's just keep it as "highest total ever reached in a day" for now if not specified.
-            // Wait, the previous logic was: if (score > high) updateHighScore.
-            // Let's stick to updating high score when current session score > daily high score.
-        }
-    }
-
     fun updateScores(date: LocalDate, sessionScore: Int) {
         viewModelScope.launch {
             val currentDaily = dao.getScoreForDate(date).first() ?: DailyScore(date, 0, 0)
             val newHigh = maxOf(currentDaily.highScore, sessionScore)
-            val newTotal = currentDaily.totalScore + 1 // This is called every tap
+            val newTotal = currentDaily.totalScore + 1
             dao.insertScore(DailyScore(date, newHigh, newTotal))
         }
     }

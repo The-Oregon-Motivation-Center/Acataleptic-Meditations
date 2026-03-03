@@ -3,11 +3,14 @@ package com.example.acatalepticmeditations.ui
 import android.media.MediaPlayer
 import android.util.Log
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MusicNote
@@ -24,8 +27,10 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.acatalepticmeditations.R
 import com.example.acatalepticmeditations.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -40,6 +45,16 @@ data class Ripple(
     val duration: Int = 5333 // Slowed down ripples to 3/4 speed
 )
 
+enum class GameMode {
+    CHILL, MEDIUM, INTENSE
+}
+
+data class GameDot(
+    val id: Int,
+    val position: Offset,
+    val isVisible: Boolean = false
+)
+
 @Composable
 fun RippleGame(
     viewModel: JournalViewModel,
@@ -48,13 +63,15 @@ fun RippleGame(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var score by remember { mutableIntStateOf(0) }
-    var dotPosition by remember { mutableStateOf<Offset?>(null) }
-    var isDotVisible by remember { mutableStateOf(false) }
     val ripples = remember { mutableStateListOf<Ripple>() }
     val today = LocalDate.now()
     val dailyScore by viewModel.getScoreForDate(today).collectAsState(initial = null)
     val density = LocalDensity.current.density
     var isMusicPlaying by remember { mutableStateOf(true) }
+    var gameMode by remember { mutableStateOf(GameMode.CHILL) }
+
+    // Use a list of dots to support Intense mode
+    val dots = remember { mutableStateListOf<GameDot>() }
 
     // Music Setup
     val mediaPlayer = remember {
@@ -81,13 +98,6 @@ fun RippleGame(
         if (isMusicPlaying) mediaPlayer?.start() else mediaPlayer?.pause()
     }
 
-    // Dot Fade Animation
-    val dotAlpha by animateFloatAsState(
-        targetValue = if (isDotVisible) 1f else 0f,
-        animationSpec = tween(durationMillis = 250),
-        label = "dotAlpha"
-    )
-
     LaunchedEffect(score) {
         if (score > 0) {
             viewModel.updateScores(today, score)
@@ -109,40 +119,59 @@ fun RippleGame(
     ) {
         val maxWidth = constraints.maxWidth.toFloat()
         val maxHeight = constraints.maxHeight.toFloat()
-        val topReservedHeight = 140f * density 
+        val topReservedHeight = 160f * density 
 
-        // Initialize dot position
-        LaunchedEffect(maxWidth, maxHeight) {
-            if (dotPosition == null) {
-                dotPosition = Offset(maxWidth / 2f, (maxHeight + topReservedHeight) / 2f)
-                delay(250)
-                isDotVisible = true
+        // Manage dots based on game mode
+        LaunchedEffect(gameMode, maxWidth, maxHeight) {
+            val targetDotCount = if (gameMode == GameMode.INTENSE) 3 else 1
+            dots.clear()
+            repeat(targetDotCount) { i ->
+                val pos = Offset(
+                    Random.nextFloat() * (maxWidth - 120f * density) + 60f * density,
+                    Random.nextFloat() * (maxHeight - topReservedHeight - 100f * density) + topReservedHeight + 50f * density
+                )
+                dots.add(GameDot(i, pos, false))
+            }
+            // Fade in initial dots
+            delay(100)
+            for (i in dots.indices) {
+                dots[i] = dots[i].copy(isVisible = true)
             }
         }
 
-        val currentDotPosition = dotPosition ?: Offset(maxWidth / 2f, (maxHeight + topReservedHeight) / 2f)
-
         Canvas(modifier = Modifier
             .fillMaxSize()
-            .pointerInput(currentDotPosition, isDotVisible) { 
-                if (!isDotVisible) return@pointerInput
+            .pointerInput(dots.toList()) { 
                 detectTapGestures { offset ->
-                    val distance = (offset - currentDotPosition).getDistance()
-                    if (distance < 65f * density) {
-                        scope.launch {
-                            isDotVisible = false
-                            val startColor = listOf(PrimaryCyber, SecondaryCyber, Color.Yellow, Color.Green, Color.Magenta).random()
-                            val targetColor = listOf(PrimaryCyber, SecondaryCyber, Color.Yellow, Color.Green, Color.Magenta).random()
-                            ripples.add(Ripple(currentDotPosition, startColor, targetColor, System.currentTimeMillis()))
-                            score++
-                            
-                            delay(250 + 500) // Fade out (250) + Wait (500)
-                            
-                            dotPosition = Offset(
-                                Random.nextFloat() * (maxWidth - 120f * density) + 60f * density,
-                                Random.nextFloat() * (maxHeight - topReservedHeight - 100f * density) + topReservedHeight + 50f * density
-                            )
-                            isDotVisible = true
+                    dots.forEachIndexed { index, dot ->
+                        if (dot.isVisible) {
+                            val distance = (offset - dot.position).getDistance()
+                            if (distance < 65f * density) {
+                                scope.launch {
+                                    val currentPos = dot.position
+                                    val startColor = listOf(PrimaryCyber, SecondaryCyber, Color.Yellow, Color.Green, Color.Magenta).random()
+                                    val targetColor = listOf(PrimaryCyber, SecondaryCyber, Color.Yellow, Color.Green, Color.Magenta).random()
+                                    ripples.add(Ripple(currentPos, startColor, targetColor, System.currentTimeMillis()))
+                                    score++
+
+                                    if (gameMode == GameMode.CHILL) {
+                                        dots[index] = dot.copy(isVisible = false)
+                                        delay(800) // Fade out (250) + Wait (500)
+                                        val newPos = Offset(
+                                            Random.nextFloat() * (maxWidth - 120f * density) + 60f * density,
+                                            Random.nextFloat() * (maxHeight - topReservedHeight - 100f * density) + topReservedHeight + 50f * density
+                                        )
+                                        dots[index] = GameDot(dot.id, newPos, true)
+                                    } else {
+                                        // Medium and Intense respawn immediately
+                                        val newPos = Offset(
+                                            Random.nextFloat() * (maxWidth - 120f * density) + 60f * density,
+                                            Random.nextFloat() * (maxHeight - topReservedHeight - 100f * density) + topReservedHeight + 50f * density
+                                        )
+                                        dots[index] = dot.copy(position = newPos)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -170,12 +199,18 @@ fun RippleGame(
             }
         }
 
-        if (dotPosition != null) {
+        // Render all dots
+        dots.forEach { dot ->
+            val dotAlpha by animateFloatAsState(
+                targetValue = if (dot.isVisible) 1f else 0f,
+                animationSpec = tween(durationMillis = 250),
+                label = "dotAlpha_${dot.id}"
+            )
             Box(
                 modifier = Modifier
                     .offset(
-                        x = (currentDotPosition.x / density).dp - 25.dp,
-                        y = (currentDotPosition.y / density).dp - 25.dp
+                        x = (dot.position.x / density).dp - 25.dp,
+                        y = (dot.position.y / density).dp - 25.dp
                     )
                     .graphicsLayer { alpha = dotAlpha }
                     .size(50.dp)
@@ -184,33 +219,60 @@ fun RippleGame(
             )
         }
 
-        Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        // Top UI Overlay
+        Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            // Mode buttons on the left
+            Column(
+                modifier = Modifier.align(Alignment.TopStart),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(text = "Score: $score", color = TextColor, fontSize = 24.sp)
-                Row {
-                    IconButton(onClick = { isMusicPlaying = !isMusicPlaying }) {
-                        Icon(
-                            imageVector = if (isMusicPlaying) Icons.Default.MusicNote else Icons.Default.MusicOff,
-                            contentDescription = "Toggle Music",
-                            tint = TextColor
-                        )
-                    }
-                    IconButton(onClick = onExit) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Exit", tint = TextColor)
-                    }
+                GameModeButton("Chill", gameMode == GameMode.CHILL) { gameMode = GameMode.CHILL }
+                GameModeButton("Medium", gameMode == GameMode.MEDIUM) { gameMode = GameMode.MEDIUM }
+                GameModeButton("Intense", gameMode == GameMode.INTENSE) { gameMode = GameMode.INTENSE }
+            }
+
+            // Score in the center
+            Column(
+                modifier = Modifier.align(Alignment.TopCenter),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(text = "Score: $score", color = TextColor, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                dailyScore?.let {
+                    Text(text = "Daily High: ${it.highScore}", color = PrimaryCyber.copy(alpha = 0.7f), fontSize = 14.sp)
+                    Text(text = "Daily Total: ${it.totalScore}", color = PrimaryCyber.copy(alpha = 0.5f), fontSize = 12.sp)
                 }
             }
-            dailyScore?.let {
-                Text(text = "Daily High: ${it.highScore}", color = PrimaryCyber.copy(alpha = 0.7f), fontSize = 16.sp)
-                Text(text = "Daily Total: ${it.totalScore}", color = PrimaryCyber.copy(alpha = 0.5f), fontSize = 14.sp)
+
+            // Controls on the right
+            Row(modifier = Modifier.align(Alignment.TopEnd)) {
+                IconButton(onClick = { isMusicPlaying = !isMusicPlaying }) {
+                    Icon(
+                        imageVector = if (isMusicPlaying) Icons.Default.MusicNote else Icons.Default.MusicOff,
+                        contentDescription = "Toggle Music",
+                        tint = TextColor
+                    )
+                }
+                IconButton(onClick = onExit) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Exit", tint = TextColor)
+                }
             }
         }
+    }
+}
+
+@Composable
+fun GameModeButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+        modifier = Modifier.height(32.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isSelected) PrimaryCyber else DarkSurface,
+            contentColor = if (isSelected) Color.Black else TextColor
+        ),
+        shape = RoundedCornerShape(8.dp),
+        border = if (!isSelected) BorderStroke(1.dp, PrimaryCyber.copy(alpha = 0.5f)) else null
+    ) {
+        Text(text = text, fontSize = 12.sp)
     }
 }

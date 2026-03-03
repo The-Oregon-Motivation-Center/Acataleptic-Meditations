@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,7 +43,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
-import com.example.acatalepticmeditations.data.DailyScore
 import com.example.acatalepticmeditations.data.JournalEntry
 import com.example.acatalepticmeditations.ui.theme.*
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -69,6 +69,7 @@ fun CalendarScreen(modifier: Modifier = Modifier, viewModel: JournalViewModel) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
     var showDialog by remember { mutableStateOf(false) }
@@ -80,22 +81,44 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
     var selectedYear by remember { mutableStateOf(LocalDate.now().year) }
     var searchQuery by remember { mutableStateOf("") }
     var entryToEdit by remember { mutableStateOf<JournalEntry?>(null) }
+    
+    // Sort and View states
+    var isDescending by remember { mutableStateOf(true) }
+    var isListViewMode by remember { mutableStateOf(false) }
+
     val journalEntries by viewModel.getEntriesForDate(selectedDate ?: LocalDate.now()).collectAsState(initial = emptyList())
+    val sortedJournalEntries = remember(journalEntries, isDescending) {
+        if (isDescending) journalEntries.sortedByDescending { it.id } else journalEntries.sortedBy { it.id }
+    }
+    
+    val allJournalEntries by viewModel.getAllEntries(isDescending).collectAsState(initial = emptyList())
     val searchResults by viewModel.searchEntries(searchQuery).collectAsState(initial = emptyList())
     val allScores by viewModel.getAllScores().collectAsState(initial = emptyList())
     val totalAppLifeScore = allScores.sumOf { it.totalScore }
-    val context = LocalContext.current
 
-    if (showDialog && selectedDate != null) {
+    if (showDialog && (selectedDate != null || entryToEdit != null)) {
         JournalEntryDialog(
-            date = selectedDate!!,
+            date = entryToEdit?.date ?: selectedDate ?: LocalDate.now(),
             entryToEdit = entryToEdit,
             onDismiss = { showDialog = false; entryToEdit = null },
-            onSave = { entry, imageUri, docUri, docName ->
+            onSave = { entry, imageUri, docUri, docName, newDate ->
+                val finalDate = newDate ?: entryToEdit?.date ?: selectedDate ?: LocalDate.now()
                 if (entryToEdit != null) {
-                    viewModel.updateJournalEntry(entryToEdit!!.copy(text = entry, imageUri = imageUri, documentUri = docUri, documentName = docName))
+                    viewModel.updateJournalEntry(entryToEdit!!.copy(
+                        date = finalDate,
+                        text = entry, 
+                        imageUri = imageUri, 
+                        documentUri = docUri, 
+                        documentName = docName
+                    ))
                 } else {
-                    viewModel.addJournalEntry(JournalEntry(date = selectedDate!!, text = entry, imageUri = imageUri, documentUri = docUri, documentName = docName))
+                    viewModel.addJournalEntry(JournalEntry(
+                        date = finalDate, 
+                        text = entry, 
+                        imageUri = imageUri, 
+                        documentUri = docUri, 
+                        documentName = docName
+                    ))
                 }
                 showDialog = false
                 entryToEdit = null
@@ -140,155 +163,169 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
             }
         }
         
-        TextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            label = { Text("Search Entries") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = TextFieldDefaults.colors(focusedTextColor = TextColor, unfocusedTextColor = TextColor, focusedContainerColor = DarkSurface, unfocusedContainerColor = DarkSurface),
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear Search", tint = TextColor)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            TextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Search Entries") },
+                modifier = Modifier.weight(1f),
+                colors = TextFieldDefaults.colors(focusedTextColor = TextColor, unfocusedTextColor = TextColor, focusedContainerColor = DarkSurface, unfocusedContainerColor = DarkSurface),
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear Search", tint = TextColor)
+                        }
                     }
                 }
+            )
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            IconButton(onClick = { isListViewMode = !isListViewMode }) {
+                Icon(
+                    imageVector = if (isListViewMode) Icons.Default.CalendarMonth else Icons.AutoMirrored.Filled.List,
+                    contentDescription = "Toggle View Mode",
+                    tint = PrimaryCyber
+                )
             }
-        )
+        }
 
         if (searchQuery.isBlank()) {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                item {
-                    Column {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            MonthDropdown(selectedMonth, modifier = Modifier.weight(1f), onMonthSelected = { selectedMonth = it })
-                            YearDropdown(selectedYear, modifier = Modifier.weight(1f), onYearSelected = { selectedYear = it })
-                        }
-                        val daysOfWeek = remember { listOf(DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY) }
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            for (day in daysOfWeek) {
-                                Text(
-                                    text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
-                                    modifier = Modifier.weight(1f),
-                                    color = TextColor,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                        CalendarGrid(
-                            selectedDate = selectedDate,
-                            onDayClick = { date -> selectedDate = date },
-                            daysOfWeek = daysOfWeek,
-                            month = selectedMonth,
-                            year = selectedYear
-                        )
-
-                        Box(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
-                            Button(
-                                onClick = { showDialog = true },
-                                modifier = Modifier.fillMaxWidth(0.5f),
-                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyber),
-                                enabled = selectedDate != null
-                            ) {
-                                Text("New Journal Entry", color = Color.Black)
-                            }
-                        }
-                    }
-                }
-
-                selectedDate?.let { date ->
-                    val dailyScore = allScores.find { it.date == date }
-                    
+                if (!isListViewMode) {
                     item {
-                        Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
-                            Text(
-                                text = "Journal Entries for ${date.month.name} ${date.dayOfMonth}:",
-                                color = TextColor,
-                                fontWeight = FontWeight.Bold
-                            )
-                            if (dailyScore != null && dailyScore.highScore > 0) {
-                                Text(
-                                    text = "Ripple High Score: ${dailyScore.highScore}",
-                                    color = PrimaryCyber,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
+                        Column {
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                MonthDropdown(selectedMonth, modifier = Modifier.weight(1f), onMonthSelected = { selectedMonth = it })
+                                YearDropdown(selectedYear, modifier = Modifier.weight(1f), onYearSelected = { selectedYear = it })
                             }
-                        }
-                    }
-                    
-                    if (journalEntries.isNotEmpty()) {
-                        items(journalEntries) { entry ->
-                            var isExpanded by remember { mutableStateOf(false) }
-                            Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                colors = CardDefaults.cardColors(containerColor = DarkSurface)
-                            ) {
-                                Column(modifier = Modifier.padding(8.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = entry.text,
-                                            modifier = Modifier.weight(1f).clickable { isExpanded = !isExpanded },
-                                            color = TextColor,
-                                            maxLines = if (isExpanded) Int.MAX_VALUE else 1,
-                                            overflow = if (isExpanded) TextOverflow.Visible else TextOverflow.Ellipsis
-                                        )
-                                        IconButton(onClick = {
-                                            entryToEdit = entry
-                                            showDialog = true
-                                        }) {
-                                            Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit Entry", tint = PrimaryCyber)
-                                        }
-                                        IconButton(onClick = { viewModel.deleteJournalEntry(entry) }) {
-                                            Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete Entry", tint = SecondaryCyber)
-                                        }
-                                    }
-                                    if (isExpanded) {
-                                        if (entry.imageUri != null) {
-                                            AsyncImage(
-                                                model = entry.imageUri,
-                                                contentDescription = null,
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(200.dp)
-                                                    .padding(top = 8.dp)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .clickable { showFullScreenImage = entry.imageUri },
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        }
-                                        if (entry.documentUri != null) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).clickable {
-                                                    try {
-                                                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                            data = Uri.parse(entry.documentUri)
-                                                            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                                        }
-                                                        context.startActivity(intent)
-                                                    } catch (e: Exception) {
-                                                        // handle error
-                                                    }
-                                                },
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(imageVector = Icons.Default.InsertDriveFile, contentDescription = null, tint = PrimaryCyber)
-                                                val displayName = entry.documentName ?: "View Document"
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(displayName, color = TextColor, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                    }
+                            val daysOfWeek = remember { listOf(DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY) }
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                for (day in daysOfWeek) {
+                                    Text(
+                                        text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                                        modifier = Modifier.weight(1f),
+                                        color = TextColor,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                            CalendarGrid(
+                                selectedDate = selectedDate,
+                                onDayClick = { date -> selectedDate = date },
+                                daysOfWeek = daysOfWeek,
+                                month = selectedMonth,
+                                year = selectedYear
+                            )
+
+                            Box(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
+                                Button(
+                                    onClick = { showDialog = true },
+                                    modifier = Modifier.fillMaxWidth(0.5f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyber),
+                                    enabled = selectedDate != null
+                                ) {
+                                    Text("New Journal Entry", color = Color.Black)
                                 }
                             }
                         }
-                    } else {
+                    }
+
+                    selectedDate?.let { date ->
+                        val dailyScore = allScores.find { it.date == date }
+                        
                         item {
-                            Text(
-                                text = "No entries for this date.",
-                                color = TextColor.copy(alpha = 0.5f),
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                fontSize = 14.sp
+                            Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Journal Entries for ${date.month.name} ${date.dayOfMonth}:",
+                                        color = TextColor,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    // Sort order toggle for current date
+                                    IconButton(onClick = { isDescending = !isDescending }, modifier = Modifier.size(24.dp)) {
+                                        Icon(
+                                            imageVector = if (isDescending) Icons.Default.VerticalAlignBottom else Icons.Default.VerticalAlignTop,
+                                            contentDescription = "Change sort order",
+                                            tint = PrimaryCyber,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                                if (dailyScore != null && dailyScore.highScore > 0) {
+                                    Text(
+                                        text = "Ripple High Score: ${dailyScore.highScore}",
+                                        color = PrimaryCyber,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                        
+                        if (sortedJournalEntries.isNotEmpty()) {
+                            items(sortedJournalEntries) { entry ->
+                                JournalEntryCard(
+                                    entry = entry,
+                                    onEdit = { entryToEdit = it; showDialog = true },
+                                    onDelete = { viewModel.deleteJournalEntry(it) },
+                                    onImageClick = { showFullScreenImage = it }
+                                )
+                            }
+                        } else {
+                            item {
+                                Text(
+                                    text = "No entries for this date.",
+                                    color = TextColor.copy(alpha = 0.5f),
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "All Journal Entries", color = TextColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            
+                            TextButton(onClick = { isDescending = !isDescending }) {
+                                Icon(
+                                    imageVector = if (isDescending) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
+                                    contentDescription = null,
+                                    tint = PrimaryCyber,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isDescending) "Newest First" else "Oldest First",
+                                    color = PrimaryCyber,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    }
+                    
+                    if (allJournalEntries.isEmpty()) {
+                        item {
+                            Text("You haven't written any entries yet.", color = TextColor.copy(alpha = 0.5f))
+                        }
+                    } else {
+                        items(allJournalEntries) { entry ->
+                            JournalEntryCard(
+                                entry = entry,
+                                showDate = true,
+                                onEdit = { entryToEdit = it; showDialog = true },
+                                onDelete = { viewModel.deleteJournalEntry(it) },
+                                onImageClick = { showFullScreenImage = it }
                             )
                         }
                     }
@@ -315,6 +352,7 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                             selectedMonth = entry.date.month
                             selectedYear = entry.date.year
                             searchQuery = ""
+                            isListViewMode = false
                         },
                         colors = CardDefaults.cardColors(containerColor = DarkSurface)
                     ) {
@@ -322,6 +360,86 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                             Text("${entry.date.monthValue}/${entry.date.dayOfMonth}/${entry.date.year}", color = PrimaryCyber, fontSize = 12.sp)
                             Text(entry.text, color = TextColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun JournalEntryCard(
+    entry: JournalEntry,
+    showDate: Boolean = false,
+    onEdit: (JournalEntry) -> Unit,
+    onDelete: (JournalEntry) -> Unit,
+    onImageClick: (String) -> Unit
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkSurface)
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            if (showDate) {
+                Text(
+                    text = "${entry.date.month.name} ${entry.date.dayOfMonth}, ${entry.date.year}",
+                    color = PrimaryCyber,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = entry.text,
+                    modifier = Modifier.weight(1f).clickable { isExpanded = !isExpanded },
+                    color = TextColor,
+                    maxLines = if (isExpanded) Int.MAX_VALUE else 1,
+                    overflow = if (isExpanded) TextOverflow.Visible else TextOverflow.Ellipsis
+                )
+                IconButton(onClick = { onEdit(entry) }) {
+                    Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit Entry", tint = PrimaryCyber)
+                }
+                IconButton(onClick = { onDelete(entry) }) {
+                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete Entry", tint = SecondaryCyber)
+                }
+            }
+            if (isExpanded) {
+                if (entry.imageUri != null) {
+                    AsyncImage(
+                        model = entry.imageUri,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .padding(top = 8.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onImageClick(entry.imageUri) },
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                if (entry.documentUri != null) {
+                    val context = LocalContext.current
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).clickable {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    data = Uri.parse(entry.documentUri)
+                                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                // handle error
+                            }
+                        },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(imageVector = Icons.Default.InsertDriveFile, contentDescription = null, tint = PrimaryCyber)
+                        val displayName = entry.documentName ?: "View Document"
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(displayName, color = TextColor, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -360,9 +478,7 @@ fun FullScreenImageViewer(imageUri: String, onDismiss: () -> Unit) {
                         translationY = offset.y
                     )
                     .transformable(state = state)
-                    .pointerInput(Unit) {
-                        // detectTapGestures { onDismiss() } // Optional
-                    },
+                    .pointerInput(Unit) { },
                 contentScale = ContentScale.Fit
             )
             IconButton(
@@ -430,12 +546,15 @@ fun CalendarGrid(selectedDate: LocalDate?, onDayClick: (LocalDate) -> Unit, days
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun JournalEntryDialog(date: LocalDate, entryToEdit: JournalEntry?, onDismiss: () -> Unit, onSave: (String, String?, String?, String?) -> Unit) {
+fun JournalEntryDialog(date: LocalDate, entryToEdit: JournalEntry?, onDismiss: () -> Unit, onSave: (String, String?, String?, String?, LocalDate?) -> Unit) {
     var text by remember { mutableStateOf(entryToEdit?.text ?: "") }
     var imageUri by remember { mutableStateOf(entryToEdit?.imageUri) }
     var documentUri by remember { mutableStateOf(entryToEdit?.documentUri) }
     var documentName by remember { mutableStateOf(entryToEdit?.documentName) }
+    var entryDate by remember { mutableStateOf(entryToEdit?.date ?: date) }
+    var showDatePicker by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
     
@@ -461,10 +580,27 @@ fun JournalEntryDialog(date: LocalDate, entryToEdit: JournalEntry?, onDismiss: (
         }
     }
 
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = entryDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let {
+                        entryDate = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            }
+        ) { DatePicker(state = datePickerState) }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            Button(onClick = { onSave(text, imageUri, documentUri, documentName) }, colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyber)) {
+            Button(onClick = { onSave(text, imageUri, documentUri, documentName, entryDate) }, colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyber)) {
                 Text("Save", color = Color.Black)
             }
         },
@@ -473,7 +609,14 @@ fun JournalEntryDialog(date: LocalDate, entryToEdit: JournalEntry?, onDismiss: (
                 Text("Cancel", color = TextColor)
             }
         },
-        title = { Text(text = "Journal Entry for ${date.month.name} ${date.dayOfMonth}, ${date.year}", color = TextColor) },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "Journal Entry", color = TextColor, modifier = Modifier.weight(1f))
+                TextButton(onClick = { showDatePicker = true }) {
+                    Text("${entryDate.monthValue}/${entryDate.dayOfMonth}/${entryDate.year}", color = PrimaryCyber)
+                }
+            }
+        },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 TextField(

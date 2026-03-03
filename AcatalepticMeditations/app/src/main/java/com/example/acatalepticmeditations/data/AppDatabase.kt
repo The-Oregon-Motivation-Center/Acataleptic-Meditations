@@ -6,7 +6,11 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
-@Database(entities = [JournalEntry::class, DailyScore::class], version = 5)
+@Database(
+    entities = [JournalEntry::class, DailyScore::class], 
+    version = 5,
+    exportSchema = true // Required for safe migrations
+)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun journalEntryDao(): JournalEntryDao
@@ -22,7 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "journal_database"
                 )
-                .fallbackToDestructiveMigration()
+                // Removed .fallbackToDestructiveMigration() to protect user data
                 .build()
                 INSTANCE = instance
                 instance

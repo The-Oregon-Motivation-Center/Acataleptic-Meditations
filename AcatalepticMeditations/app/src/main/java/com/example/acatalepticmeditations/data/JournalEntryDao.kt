@@ -17,6 +17,12 @@ interface JournalEntryDao {
     @Query("SELECT * FROM journal_entries WHERE text LIKE '%' || :query || '%' ORDER BY date DESC")
     fun searchEntries(query: String): Flow<List<JournalEntry>>
 
+    @Query("SELECT * FROM journal_entries ORDER BY date DESC")
+    fun getAllEntriesDescending(): Flow<List<JournalEntry>>
+
+    @Query("SELECT * FROM journal_entries ORDER BY date ASC")
+    fun getAllEntriesAscending(): Flow<List<JournalEntry>>
+
     @Insert
     suspend fun insert(entry: JournalEntry)
 
