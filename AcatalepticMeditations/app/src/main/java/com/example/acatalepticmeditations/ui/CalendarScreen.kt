@@ -7,6 +7,7 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,10 +31,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.example.acatalepticmeditations.data.DailyScore
 import com.example.acatalepticmeditations.data.JournalEntry
 import com.example.acatalepticmeditations.ui.theme.*
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -64,6 +67,7 @@ fun CalendarScreen(modifier: Modifier = Modifier, viewModel: JournalViewModel) {
 private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
     var showDialog by remember { mutableStateOf(false) }
     var showLinksDialog by remember { mutableStateOf(false) }
+    var showRippleGame by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     var selectedMonth by remember { mutableStateOf(LocalDate.now().month) }
     var selectedYear by remember { mutableStateOf(LocalDate.now().year) }
@@ -71,6 +75,7 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
     var entryToEdit by remember { mutableStateOf<JournalEntry?>(null) }
     val journalEntries by viewModel.getEntriesForDate(selectedDate ?: LocalDate.now()).collectAsState(initial = emptyList())
     val searchResults by viewModel.searchEntries(searchQuery).collectAsState(initial = emptyList())
+    val allScores by viewModel.getAllScores().collectAsState(initial = emptyList())
     val context = LocalContext.current
 
     if (showDialog && selectedDate != null) {
@@ -94,14 +99,32 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
         LinksDialog(onDismiss = { showLinksDialog = false })
     }
 
+    if (showRippleGame) {
+        Dialog(
+            onDismissRequest = { showRippleGame = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            RippleGame(viewModel = viewModel, onExit = { showRippleGame = false })
+        }
+    }
+
     Column(modifier = modifier.fillMaxSize().background(DarkBackground).padding(16.dp)) {
-        Text(
-            text = "Acataleptic Meditations",
-            fontSize = 24.sp,
-            color = TextColor,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp).clickable { showLinksDialog = true },
-            textAlign = TextAlign.Center
-        )
+        Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+            Text(
+                text = "Acataleptic Meditations",
+                fontSize = 24.sp,
+                color = TextColor,
+                modifier = Modifier.align(Alignment.Center).clickable { showLinksDialog = true },
+                textAlign = TextAlign.Center
+            )
+            IconButton(
+                onClick = { showRippleGame = true },
+                modifier = Modifier.align(Alignment.CenterEnd).size(32.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Games, contentDescription = "Ripple Game", tint = PrimaryCyber)
+            }
+        }
+        
         TextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
@@ -136,7 +159,13 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                                 )
                             }
                         }
-                        CalendarGrid(onDayClick = { date -> selectedDate = date }, daysOfWeek = daysOfWeek, month = selectedMonth, year = selectedYear)
+                        CalendarGrid(
+                            selectedDate = selectedDate,
+                            onDayClick = { date -> selectedDate = date },
+                            daysOfWeek = daysOfWeek,
+                            month = selectedMonth,
+                            year = selectedYear
+                        )
 
                         Box(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
                             Button(
@@ -152,10 +181,28 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                 }
 
                 selectedDate?.let { date ->
-                    if (journalEntries.isNotEmpty()) {
-                        item {
-                            Text(text = "Journal Entries for ${date.month.name} ${date.dayOfMonth}:", color = TextColor, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
+                    val dailyScore = allScores.find { it.date == date }
+                    
+                    item {
+                        Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
+                            Text(
+                                text = "Journal Entries for ${date.month.name} ${date.dayOfMonth}:",
+                                color = TextColor,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (dailyScore != null && dailyScore.highScore > 0) {
+                                Text(
+                                    text = "Ripple High Score: ${dailyScore.highScore}",
+                                    color = PrimaryCyber,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
                         }
+                    }
+                    
+                    if (journalEntries.isNotEmpty()) {
                         items(journalEntries) { entry ->
                             var isExpanded by remember { mutableStateOf(false) }
                             Card(
@@ -169,7 +216,7 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                                             modifier = Modifier.weight(1f).clickable { isExpanded = !isExpanded },
                                             color = TextColor,
                                             maxLines = if (isExpanded) Int.MAX_VALUE else 1,
-                                            overflow = if (isExpanded) TextOverflow.Clip else TextOverflow.Ellipsis
+                                            overflow = if (isExpanded) TextOverflow.Visible else TextOverflow.Ellipsis
                                         )
                                         IconButton(onClick = {
                                             entryToEdit = entry
@@ -200,19 +247,29 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                                                         }
                                                         context.startActivity(intent)
                                                     } catch (e: Exception) {
-                                                        // Handle error
+                                                        // handle error
                                                     }
                                                 },
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Icon(imageVector = Icons.Default.Description, contentDescription = null, tint = PrimaryCyber)
+                                                Icon(imageVector = Icons.Default.InsertDriveFile, contentDescription = null, tint = PrimaryCyber)
+                                                val displayName = entry.documentName ?: "View Document"
                                                 Spacer(modifier = Modifier.width(8.dp))
-                                                Text(entry.documentName ?: "View Document", color = TextColor, fontWeight = FontWeight.Bold)
+                                                Text(displayName, color = TextColor, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                     }
                                 }
                             }
+                        }
+                    } else {
+                        item {
+                            Text(
+                                text = "No entries for this date.",
+                                color = TextColor.copy(alpha = 0.5f),
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                fontSize = 14.sp
+                            )
                         }
                     }
                 }
@@ -253,7 +310,7 @@ fun CalendarPermissionRequest(calendarPermissionState: com.google.accompanist.pe
 }
 
 @Composable
-fun CalendarGrid(onDayClick: (LocalDate) -> Unit, daysOfWeek: List<DayOfWeek>, month: Month, year: Int) {
+fun CalendarGrid(selectedDate: LocalDate?, onDayClick: (LocalDate) -> Unit, daysOfWeek: List<DayOfWeek>, month: Month, year: Int) {
     val currentMonth = YearMonth.of(year, month)
     val daysInMonth = currentMonth.lengthOfMonth()
     val firstDayOfMonth = currentMonth.atDay(1).dayOfWeek
@@ -269,6 +326,7 @@ fun CalendarGrid(onDayClick: (LocalDate) -> Unit, daysOfWeek: List<DayOfWeek>, m
             val dayOfMonth = day + 1
             val date = currentMonth.atDay(dayOfMonth)
             val isToday = date == today
+            val isSelected = date == selectedDate
 
             Box(
                 modifier = Modifier
@@ -276,6 +334,11 @@ fun CalendarGrid(onDayClick: (LocalDate) -> Unit, daysOfWeek: List<DayOfWeek>, m
                     .padding(4.dp)
                     .clip(CircleShape)
                     .background(if (isToday) PrimaryCyber else Color.Transparent)
+                    .border(
+                        width = 2.dp,
+                        color = if (isSelected) SecondaryCyber else Color.Transparent,
+                        shape = CircleShape
+                    )
                     .clickable { onDayClick(date) },
                 contentAlignment = Alignment.Center
             ) {
@@ -307,17 +370,31 @@ fun JournalEntryDialog(date: LocalDate, entryToEdit: JournalEntry?, onDismiss: (
     ) { uri: Uri? ->
         documentUri = uri?.toString()
         uri?.let {
-            context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
-                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (nameIndex != -1 && cursor.moveToFirst()) {
-                    documentName = cursor.getString(nameIndex)
+            try {
+                context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex != -1 && cursor.moveToFirst()) {
+                        documentName = cursor.getString(nameIndex)
+                    }
                 }
+            } catch (e: Exception) {
+                // handle
             }
         }
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(onClick = { onSave(text, imageUri, documentUri, documentName) }, colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyber)) {
+                Text("Save", color = Color.Black)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextColor)
+            }
+        },
         title = { Text(text = "Journal Entry for ${date.month.name} ${date.dayOfMonth}, ${date.year}", color = TextColor) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -355,7 +432,7 @@ fun JournalEntryDialog(date: LocalDate, entryToEdit: JournalEntry?, onDismiss: (
                 // Document Section
                 if (documentUri != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Description, contentDescription = null, tint = PrimaryCyber)
+                        Icon(imageVector = Icons.Default.InsertDriveFile, contentDescription = null, tint = PrimaryCyber)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(documentName ?: "Document attached", color = TextColor, modifier = Modifier.weight(1f))
                         IconButton(onClick = { 
@@ -375,16 +452,6 @@ fun JournalEntryDialog(date: LocalDate, entryToEdit: JournalEntry?, onDismiss: (
                 }
             }
         },
-        confirmButton = {
-            Button(onClick = { onSave(text, imageUri, documentUri, documentName) }, colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyber)) {
-                Text("Save", color = Color.Black)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TextColor)
-            }
-        },
         containerColor = DarkSurface
     )
 }
@@ -394,6 +461,8 @@ fun LinksDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     AlertDialog(
         onDismissRequest = onDismiss,
+        confirmButton = { },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close", color = TextColor) } },
         title = { Text(text = "About Us", color = PrimaryCyber) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -406,7 +475,7 @@ fun LinksDialog(onDismiss: () -> Unit) {
                     Text("Oregon Motivation Center", color = TextColor)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = { val intent = Intent(Intent.ACTION_VIEW, Uri.parse("http://www.rimvale.com")); context.startActivity(intent) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = DarkBackground)) {
+                Button(onClick = { val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://rimvale.com/books")); context.startActivity(intent) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = DarkBackground)) {
                     Text("Rimvale", color = TextColor)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -418,13 +487,18 @@ fun LinksDialog(onDismiss: () -> Unit) {
                     Text("Youtube", color = TextColor)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = { val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.qobuz.com/us-en/interpreter/blaine-lambert/26425789")); context.startActivity(intent) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = DarkBackground)) {
+                Button(
+                    onClick = { 
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.qobuz.com/us-en/interpreter/blaine-lambert/26425789"))
+                        context.startActivity(intent) 
+                    }, 
+                    modifier = Modifier.fillMaxWidth(), 
+                    colors = ButtonDefaults.buttonColors(containerColor = DarkBackground)
+                ) {
                     Text("Qobuz", color = TextColor)
                 }
             }
         },
-        confirmButton = { },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close", color = TextColor) } },
         containerColor = DarkSurface
     )
 }

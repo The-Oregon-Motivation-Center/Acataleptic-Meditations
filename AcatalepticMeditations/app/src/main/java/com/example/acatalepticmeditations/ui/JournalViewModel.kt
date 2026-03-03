@@ -3,6 +3,7 @@ package com.example.acatalepticmeditations.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.acatalepticmeditations.data.DailyScore
 import com.example.acatalepticmeditations.data.JournalEntry
 import com.example.acatalepticmeditations.data.JournalEntryDao
 import kotlinx.coroutines.flow.Flow
@@ -35,6 +36,21 @@ class JournalViewModel(private val dao: JournalEntryDao) : ViewModel() {
         viewModelScope.launch {
             dao.delete(entry)
         }
+    }
+
+    // Ripple Game Score methods
+    fun getScoreForDate(date: LocalDate): Flow<DailyScore?> {
+        return dao.getScoreForDate(date)
+    }
+
+    fun updateHighScore(date: LocalDate, newScore: Int) {
+        viewModelScope.launch {
+            dao.insertScore(DailyScore(date, newScore))
+        }
+    }
+
+    fun getAllScores(): Flow<List<DailyScore>> {
+        return dao.getAllScores()
     }
 }
 

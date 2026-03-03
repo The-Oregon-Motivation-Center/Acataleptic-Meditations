@@ -3,6 +3,7 @@ package com.example.acatalepticmeditations.data
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
@@ -24,4 +25,14 @@ interface JournalEntryDao {
 
     @Delete
     suspend fun delete(entry: JournalEntry)
+
+    // Daily Score methods
+    @Query("SELECT * FROM daily_scores WHERE date = :date")
+    fun getScoreForDate(date: LocalDate): Flow<DailyScore?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertScore(score: DailyScore)
+
+    @Query("SELECT * FROM daily_scores")
+    fun getAllScores(): Flow<List<DailyScore>>
 }
