@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
@@ -38,6 +39,9 @@ interface JournalEntryDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertScore(score: DailyScore)
+
+    @Query("UPDATE daily_scores SET totalScore = totalScore + 1, highScore = CASE WHEN :sessionScore > highScore THEN :sessionScore ELSE highScore END WHERE date = :date")
+    suspend fun incrementDailyScore(date: LocalDate, sessionScore: Int)
 
     @Query("SELECT * FROM daily_scores")
     fun getAllScores(): Flow<List<DailyScore>>

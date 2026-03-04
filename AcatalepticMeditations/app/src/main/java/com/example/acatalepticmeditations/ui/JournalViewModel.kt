@@ -48,12 +48,15 @@ class JournalViewModel(private val dao: JournalEntryDao) : ViewModel() {
         return dao.getScoreForDate(date)
     }
 
-    fun updateScores(date: LocalDate, sessionScore: Int) {
+    fun incrementDailyScore(date: LocalDate, sessionScore: Int) {
         viewModelScope.launch {
-            val currentDaily = dao.getScoreForDate(date).first() ?: DailyScore(date, 0, 0)
-            val newHigh = maxOf(currentDaily.highScore, sessionScore)
-            val newTotal = currentDaily.totalScore + 1
-            dao.insertScore(DailyScore(date, newHigh, newTotal))
+            // Atomic increment in database to handle simultaneous taps
+            val exists = dao.getScoreForDate(date).first() != null
+            if (!exists) {
+                dao.insertScore(DailyScore(date, sessionScore, 1))
+            } else {
+                dao.incrementDailyScore(date, sessionScore)
+            }
         }
     }
 

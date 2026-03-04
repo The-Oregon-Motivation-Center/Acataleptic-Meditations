@@ -98,12 +98,6 @@ fun RippleGame(
         if (isMusicPlaying) mediaPlayer?.start() else mediaPlayer?.pause()
     }
 
-    LaunchedEffect(score) {
-        if (score > 0) {
-            viewModel.updateScores(today, score)
-        }
-    }
-
     val infiniteTransition = rememberInfiniteTransition(label = "rippleTicker")
     val ticker by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -141,18 +135,22 @@ fun RippleGame(
 
         Canvas(modifier = Modifier
             .fillMaxSize()
-            .pointerInput(dots.toList()) { 
+            .pointerInput(dots.toList(), gameMode) { 
                 detectTapGestures { offset ->
                     dots.forEachIndexed { index, dot ->
                         if (dot.isVisible) {
                             val distance = (offset - dot.position).getDistance()
                             if (distance < 65f * density) {
+                                // Increment session score
+                                score++
+                                // CRITICAL FIX: Direct atomic increment in database
+                                viewModel.incrementDailyScore(today, score)
+                                
                                 scope.launch {
                                     val currentPos = dot.position
                                     val startColor = listOf(PrimaryCyber, SecondaryCyber, Color.Yellow, Color.Green, Color.Magenta).random()
                                     val targetColor = listOf(PrimaryCyber, SecondaryCyber, Color.Yellow, Color.Green, Color.Magenta).random()
                                     ripples.add(Ripple(currentPos, startColor, targetColor, System.currentTimeMillis()))
-                                    score++
 
                                     if (gameMode == GameMode.CHILL) {
                                         dots[index] = dot.copy(isVisible = false)
