@@ -224,7 +224,8 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                                 onDayClick = { date -> selectedDate = date },
                                 daysOfWeek = daysOfWeek,
                                 month = selectedMonth,
-                                year = selectedYear
+                                year = selectedYear,
+                                entries = allJournalEntries
                             )
 
                             Box(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
@@ -331,7 +332,7 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                             JournalEntryCard(
                                 entry = entry,
                                 showDate = true,
-                                onEdit = { entryToEdit = it; selectedDate = it.date; showDialog = true },
+                                onEdit = { entryToEdit = it; showDialog = true },
                                 onDelete = { viewModel.deleteJournalEntry(it) },
                                 onImageClick = { showFullScreenImage = it }
                             )
@@ -512,7 +513,7 @@ fun CalendarPermissionRequest(calendarPermissionState: com.google.accompanist.pe
 }
 
 @Composable
-fun CalendarGrid(selectedDate: LocalDate?, onDayClick: (LocalDate) -> Unit, daysOfWeek: List<DayOfWeek>, month: Month, year: Int) {
+fun CalendarGrid(selectedDate: LocalDate?, onDayClick: (LocalDate) -> Unit, daysOfWeek: List<DayOfWeek>, month: Month, year: Int, entries: List<JournalEntry> = emptyList()) {
     val currentMonth = YearMonth.of(year, month)
     val daysInMonth = currentMonth.lengthOfMonth()
     val firstDayOfMonth = currentMonth.atDay(1).dayOfWeek
@@ -529,13 +530,18 @@ fun CalendarGrid(selectedDate: LocalDate?, onDayClick: (LocalDate) -> Unit, days
             val date = currentMonth.atDay(dayOfMonth)
             val isToday = date == today
             val isSelected = date == selectedDate
+            val hasEntries = entries.any { it.date == date }
 
             Box(
                 modifier = Modifier
                     .aspectRatio(1f)
                     .padding(4.dp)
                     .clip(CircleShape)
-                    .background(if (isToday) PrimaryCyber else Color.Transparent)
+                    .background(
+                        if (isToday) PrimaryCyber 
+                        else if (hasEntries) PrimaryCyber.copy(alpha = 0.2f) 
+                        else Color.Transparent
+                    )
                     .border(
                         width = 2.dp,
                         color = if (isSelected) SecondaryCyber else Color.Transparent,
@@ -589,7 +595,6 @@ fun JournalEntryDialog(date: LocalDate, entryToEdit: JournalEntry?, onDismiss: (
     }
 
     if (showDatePicker) {
-        // Convert LocalDate to UTC Millis for DatePicker
         val initialMillis = entryDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
         
@@ -598,7 +603,6 @@ fun JournalEntryDialog(date: LocalDate, entryToEdit: JournalEntry?, onDismiss: (
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let {
-                        // Convert UTC Millis back to LocalDate accurately
                         entryDate = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
                     }
                     showDatePicker = false
