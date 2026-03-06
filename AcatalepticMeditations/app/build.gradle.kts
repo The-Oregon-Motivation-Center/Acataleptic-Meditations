@@ -6,22 +6,32 @@ plugins {
 }
 
 android {
-    namespace = "com.example.acatalepticmeditations"
-    compileSdk = 34
+    namespace = "com.acataleptic.meditations"
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.acatalepticmeditations"
+        applicationId = "com.acataleptic.meditations"
         minSdk = 33
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("C:/Users/Acata/AndroidStudioProjects/Acat the app.jks")
+            storePassword = "@Penultimate1"
+            keyAlias = "key0"
+            keyPassword = "@Penultimate1"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -40,7 +50,6 @@ android {
     }
 }
 
-// Corrected KSP configuration location
 ksp {
     arg("room.schemaLocation", "${projectDir}/schemas")
 }

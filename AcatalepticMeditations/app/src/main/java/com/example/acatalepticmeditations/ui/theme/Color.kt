@@ -1,4 +1,4 @@
-package com.example.acatalepticmeditations.ui.theme
+package com.acataleptic.meditations.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

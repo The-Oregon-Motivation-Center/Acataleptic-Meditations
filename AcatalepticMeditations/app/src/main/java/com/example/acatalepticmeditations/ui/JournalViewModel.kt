@@ -1,11 +1,11 @@
-package com.example.acatalepticmeditations.ui
+package com.acataleptic.meditations.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.acatalepticmeditations.data.DailyScore
-import com.example.acatalepticmeditations.data.JournalEntry
-import com.example.acatalepticmeditations.data.JournalEntryDao
+import com.acataleptic.meditations.data.DailyScore
+import com.acataleptic.meditations.data.JournalEntry
+import com.acataleptic.meditations.data.JournalEntryDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

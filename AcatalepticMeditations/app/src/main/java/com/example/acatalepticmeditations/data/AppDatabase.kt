@@ -1,4 +1,4 @@
-package com.example.acatalepticmeditations.data
+package com.acataleptic.meditations.data
 
 import android.content.Context
 import androidx.room.Database
@@ -9,7 +9,7 @@ import androidx.room.TypeConverters
 @Database(
     entities = [JournalEntry::class, DailyScore::class], 
     version = 5,
-    exportSchema = true // Required for safe migrations
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -26,7 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "journal_database"
                 )
-                // Removed .fallbackToDestructiveMigration() to protect user data
+                .fallbackToDestructiveMigration(false) // This is the default, but explicit for clarity
                 .build()
                 INSTANCE = instance
                 instance

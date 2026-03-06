@@ -1,4 +1,4 @@
-package com.example.acatalepticmeditations.data
+package com.acataleptic.meditations.data
 
 import androidx.room.Dao
 import androidx.room.Delete

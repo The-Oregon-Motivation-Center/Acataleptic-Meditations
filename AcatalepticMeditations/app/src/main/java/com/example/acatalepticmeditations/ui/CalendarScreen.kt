@@ -1,4 +1,4 @@
-package com.example.acatalepticmeditations.ui
+package com.acataleptic.meditations.ui
 
 import android.Manifest
 import android.content.Intent
@@ -11,7 +11,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -43,8 +42,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
-import com.example.acatalepticmeditations.data.JournalEntry
-import com.example.acatalepticmeditations.ui.theme.*
+import com.acataleptic.meditations.data.JournalEntry
+import com.acataleptic.meditations.ui.theme.*
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState

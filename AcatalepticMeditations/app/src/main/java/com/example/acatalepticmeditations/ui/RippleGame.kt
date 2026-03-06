@@ -1,4 +1,4 @@
-package com.example.acatalepticmeditations.ui
+package com.acataleptic.meditations.ui
 
 import android.media.MediaPlayer
 import android.util.Log
@@ -30,8 +30,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.acatalepticmeditations.R
-import com.example.acatalepticmeditations.ui.theme.*
+import com.acataleptic.meditations.R
+import com.acataleptic.meditations.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -114,6 +114,7 @@ fun RippleGame(
         val maxWidth = constraints.maxWidth.toFloat()
         val maxHeight = constraints.maxHeight.toFloat()
         val topReservedHeight = 160f * density 
+        val bottomReservedHeight = 50f * density // Lower limit buffer
 
         // Manage dots based on game mode
         LaunchedEffect(gameMode, maxWidth, maxHeight) {
@@ -122,7 +123,7 @@ fun RippleGame(
             repeat(targetDotCount) { i ->
                 val pos = Offset(
                     Random.nextFloat() * (maxWidth - 120f * density) + 60f * density,
-                    Random.nextFloat() * (maxHeight - topReservedHeight - 100f * density) + topReservedHeight + 50f * density
+                    Random.nextFloat() * (maxHeight - topReservedHeight - bottomReservedHeight - 100f * density) + topReservedHeight + 50f * density
                 )
                 dots.add(GameDot(i, pos, false))
             }
@@ -157,14 +158,14 @@ fun RippleGame(
                                         delay(800) // Fade out (250) + Wait (500)
                                         val newPos = Offset(
                                             Random.nextFloat() * (maxWidth - 120f * density) + 60f * density,
-                                            Random.nextFloat() * (maxHeight - topReservedHeight - 100f * density) + topReservedHeight + 50f * density
+                                            Random.nextFloat() * (maxHeight - topReservedHeight - bottomReservedHeight - 100f * density) + topReservedHeight + 50f * density
                                         )
                                         dots[index] = GameDot(dot.id, newPos, true)
                                     } else {
                                         // Medium and Intense respawn immediately
                                         val newPos = Offset(
                                             Random.nextFloat() * (maxWidth - 120f * density) + 60f * density,
-                                            Random.nextFloat() * (maxHeight - topReservedHeight - 100f * density) + topReservedHeight + 50f * density
+                                            Random.nextFloat() * (maxHeight - topReservedHeight - bottomReservedHeight - 100f * density) + topReservedHeight + 50f * density
                                         )
                                         dots[index] = dot.copy(position = newPos)
                                     }
