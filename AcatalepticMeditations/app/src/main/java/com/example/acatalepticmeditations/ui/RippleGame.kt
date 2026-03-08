@@ -124,8 +124,8 @@ fun RippleGame(
         LaunchedEffect(gameMode, maxWidth, maxHeight, isPaused) {
             if (isPaused) return@LaunchedEffect
             
-            if (dots.isEmpty()) {
-                val targetDotCount = if (gameMode == GameMode.INTENSE) 3 else 1
+            val targetDotCount = if (gameMode == GameMode.INTENSE) 3 else 1
+            if (dots.size != targetDotCount) {
                 dots.clear()
                 repeat(targetDotCount) { i ->
                     val pos = Offset(
