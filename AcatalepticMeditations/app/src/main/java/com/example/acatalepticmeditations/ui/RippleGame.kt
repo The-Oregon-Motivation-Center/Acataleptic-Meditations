@@ -154,7 +154,7 @@ fun RippleGame(
                                 // Increment session score
                                 score++
                                 // CRITICAL FIX: Direct atomic increment in database
-                                viewModel.incrementDailyScore(today, score)
+                                viewModel.incrementRippleScore(today, score)
                                 
                                 scope.launch {
                                     val currentPos = dot.position
@@ -291,8 +291,8 @@ fun RippleGame(
             ) {
                 Text(text = "Score: $score", color = TextColor, fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 dailyScore?.let {
-                    Text(text = "Daily High: ${it.highScore}", color = PrimaryCyber.copy(alpha = 0.7f), fontSize = 14.sp)
-                    Text(text = "Daily Total: ${it.totalScore}", color = PrimaryCyber.copy(alpha = 0.5f), fontSize = 12.sp)
+                    Text(text = "Daily High: ${it.rippleHighScore}", color = PrimaryCyber.copy(alpha = 0.7f), fontSize = 14.sp)
+                    Text(text = "Daily Total: ${it.rippleTotalScore}", color = PrimaryCyber.copy(alpha = 0.5f), fontSize = 12.sp)
                 }
             }
 

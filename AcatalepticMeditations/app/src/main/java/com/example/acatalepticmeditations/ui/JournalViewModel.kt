@@ -43,19 +43,29 @@ class JournalViewModel(private val dao: JournalEntryDao) : ViewModel() {
         }
     }
 
-    // Ripple Game Score methods
+    // Score methods
     fun getScoreForDate(date: LocalDate): Flow<DailyScore?> {
         return dao.getScoreForDate(date)
     }
 
-    fun incrementDailyScore(date: LocalDate, sessionScore: Int) {
+    fun incrementRippleScore(date: LocalDate, sessionScore: Int) {
         viewModelScope.launch {
-            // Atomic increment in database to handle simultaneous taps
             val exists = dao.getScoreForDate(date).first() != null
             if (!exists) {
-                dao.insertScore(DailyScore(date, sessionScore, 1))
+                dao.insertScore(DailyScore(date = date, rippleHighScore = sessionScore, rippleTotalScore = 1))
             } else {
-                dao.incrementDailyScore(date, sessionScore)
+                dao.incrementRippleScore(date, sessionScore)
+            }
+        }
+    }
+
+    fun incrementTracerScore(date: LocalDate, sessionScore: Int) {
+        viewModelScope.launch {
+            val exists = dao.getScoreForDate(date).first() != null
+            if (!exists) {
+                dao.insertScore(DailyScore(date = date, tracerHighScore = sessionScore, tracerTotalScore = 1))
+            } else {
+                dao.incrementTracerScore(date, sessionScore)
             }
         }
     }

@@ -81,6 +81,7 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
     var showDialog by remember { mutableStateOf(false) }
     var showLinksDialog by remember { mutableStateOf(false) }
     var showRippleGame by remember { mutableStateOf(false) }
+    var showTracerGame by remember { mutableStateOf(false) }
     var showFullScreenImage by remember { mutableStateOf<String?>(null) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
     var selectedMonth by remember { mutableStateOf(LocalDate.now().month) }
@@ -101,7 +102,7 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
     val allJournalEntries by viewModel.getAllEntries(isDescending).collectAsState(initial = emptyList())
     val searchResults by viewModel.searchEntries(searchQuery).collectAsState(initial = emptyList())
     val allScores by viewModel.getAllScores().collectAsState(initial = emptyList())
-    val totalAppLifeScore = allScores.sumOf { it.totalScore }
+    val totalAppLifeScore = allScores.sumOf { it.rippleTotalScore + it.tracerTotalScore }
 
     if (showDialog && (selectedDate != null || entryToEdit != null)) {
         JournalEntryDialog(
@@ -152,6 +153,15 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
         }
     }
 
+    if (showTracerGame) {
+        Dialog(
+            onDismissRequest = { showTracerGame = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            TracerGame(viewModel = viewModel, onExit = { showTracerGame = false })
+        }
+    }
+
     if (showFullScreenImage != null) {
         FullScreenImageViewer(
             imageUri = showFullScreenImage!!,
@@ -191,7 +201,14 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                             },
                             leadingIcon = { Icon(Icons.Default.Games, contentDescription = null, tint = PrimaryCyber) }
                         )
-                        // Add future games here
+                        DropdownMenuItem(
+                            text = { Text("Tracer Game", color = TextColor) },
+                            onClick = {
+                                showTracerGame = true
+                                showGameMenu = false
+                            },
+                            leadingIcon = { Icon(Icons.Default.Gesture, contentDescription = null, tint = PrimaryCyber) }
+                        )
                     }
                 }
             }
@@ -289,14 +306,26 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                                             )
                                         }
                                     }
-                                    if (dailyScore != null && dailyScore.highScore > 0) {
-                                        Text(
-                                            text = "Ripple High Score: ${dailyScore.highScore}",
-                                            color = PrimaryCyber,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            modifier = Modifier.padding(top = 4.dp)
-                                        )
+                                    if (dailyScore != null) {
+                                        Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                                            if (dailyScore.rippleHighScore > 0) {
+                                                Text(
+                                                    text = "Ripple High: ${dailyScore.rippleHighScore}",
+                                                    color = PrimaryCyber,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    modifier = Modifier.padding(end = 16.dp)
+                                                )
+                                            }
+                                            if (dailyScore.tracerHighScore > 0) {
+                                                Text(
+                                                    text = "Tracer High: ${dailyScore.tracerHighScore}",
+                                                    color = SecondaryCyber,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }

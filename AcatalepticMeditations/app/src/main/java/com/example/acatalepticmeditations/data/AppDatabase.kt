@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 
 @Database(
     entities = [JournalEntry::class, DailyScore::class], 
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -26,7 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "journal_database"
                 )
-                .fallbackToDestructiveMigration(false) // This is the default, but explicit for clarity
+                .fallbackToDestructiveMigration(true) // Set to true for development to handle schema changes easily
                 .build()
                 INSTANCE = instance
                 instance

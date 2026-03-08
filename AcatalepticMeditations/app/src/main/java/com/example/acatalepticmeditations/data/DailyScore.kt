@@ -8,6 +8,8 @@ import java.time.LocalDate
 data class DailyScore(
     @PrimaryKey
     val date: LocalDate,
-    val highScore: Int,
-    val totalScore: Int = 0
+    val rippleHighScore: Int = 0,
+    val rippleTotalScore: Int = 0,
+    val tracerHighScore: Int = 0,
+    val tracerTotalScore: Int = 0
 )
