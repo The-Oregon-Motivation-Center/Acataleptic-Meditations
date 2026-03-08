@@ -15,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MusicOff
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -69,6 +71,8 @@ fun RippleGame(
     val density = LocalDensity.current.density
     var isMusicPlaying by remember { mutableStateOf(true) }
     var gameMode by remember { mutableStateOf(GameMode.CHILL) }
+    var isPaused by remember { mutableStateOf(false) }
+    var pausedTime by remember { mutableLongStateOf(0L) }
 
     // Use a list of dots to support Intense mode
     val dots = remember { mutableStateListOf<GameDot>() }
@@ -94,8 +98,8 @@ fun RippleGame(
         }
     }
 
-    LaunchedEffect(isMusicPlaying) {
-        if (isMusicPlaying) mediaPlayer?.start() else mediaPlayer?.pause()
+    LaunchedEffect(isMusicPlaying, isPaused) {
+        if (isMusicPlaying && !isPaused) mediaPlayer?.start() else mediaPlayer?.pause()
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "rippleTicker")
@@ -114,29 +118,34 @@ fun RippleGame(
         val maxWidth = constraints.maxWidth.toFloat()
         val maxHeight = constraints.maxHeight.toFloat()
         val topReservedHeight = 160f * density 
-        val bottomReservedHeight = 50f * density // Lower limit buffer
+        val bottomReservedHeight = 80f * density // Increased to accommodate pause button
 
         // Manage dots based on game mode
-        LaunchedEffect(gameMode, maxWidth, maxHeight) {
-            val targetDotCount = if (gameMode == GameMode.INTENSE) 3 else 1
-            dots.clear()
-            repeat(targetDotCount) { i ->
-                val pos = Offset(
-                    Random.nextFloat() * (maxWidth - 120f * density) + 60f * density,
-                    Random.nextFloat() * (maxHeight - topReservedHeight - bottomReservedHeight - 100f * density) + topReservedHeight + 50f * density
-                )
-                dots.add(GameDot(i, pos, false))
-            }
-            // Fade in initial dots
-            delay(100)
-            for (i in dots.indices) {
-                dots[i] = dots[i].copy(isVisible = true)
+        LaunchedEffect(gameMode, maxWidth, maxHeight, isPaused) {
+            if (isPaused) return@LaunchedEffect
+            
+            if (dots.isEmpty()) {
+                val targetDotCount = if (gameMode == GameMode.INTENSE) 3 else 1
+                dots.clear()
+                repeat(targetDotCount) { i ->
+                    val pos = Offset(
+                        Random.nextFloat() * (maxWidth - 120f * density) + 60f * density,
+                        Random.nextFloat() * (maxHeight - topReservedHeight - bottomReservedHeight - 100f * density) + topReservedHeight + 50f * density
+                    )
+                    dots.add(GameDot(i, pos, false))
+                }
+                // Fade in initial dots
+                delay(100)
+                for (i in dots.indices) {
+                    dots[i] = dots[i].copy(isVisible = true)
+                }
             }
         }
 
         Canvas(modifier = Modifier
             .fillMaxSize()
-            .pointerInput(dots.toList(), gameMode) { 
+            .pointerInput(dots.toList(), gameMode, isPaused) { 
+                if (isPaused) return@pointerInput
                 detectTapGestures { offset ->
                     dots.forEachIndexed { index, dot ->
                         if (dot.isVisible) {
@@ -156,11 +165,13 @@ fun RippleGame(
                                     if (gameMode == GameMode.CHILL) {
                                         dots[index] = dot.copy(isVisible = false)
                                         delay(800) // Fade out (250) + Wait (500)
-                                        val newPos = Offset(
-                                            Random.nextFloat() * (maxWidth - 120f * density) + 60f * density,
-                                            Random.nextFloat() * (maxHeight - topReservedHeight - bottomReservedHeight - 100f * density) + topReservedHeight + 50f * density
-                                        )
-                                        dots[index] = GameDot(dot.id, newPos, true)
+                                        if (!isPaused) {
+                                            val newPos = Offset(
+                                                Random.nextFloat() * (maxWidth - 120f * density) + 60f * density,
+                                                Random.nextFloat() * (maxHeight - topReservedHeight - bottomReservedHeight - 100f * density) + topReservedHeight + 50f * density
+                                            )
+                                            dots[index] = GameDot(dot.id, newPos, true)
+                                        }
                                     } else {
                                         // Medium and Intense respawn immediately
                                         val newPos = Offset(
@@ -176,8 +187,12 @@ fun RippleGame(
                 }
             }) {
             val _t = ticker
-            val currentTime = System.currentTimeMillis()
-            ripples.removeIf { (currentTime - it.startTime) > it.duration }
+            val currentTime = if (isPaused) pausedTime else System.currentTimeMillis()
+            
+            if (!isPaused) {
+                ripples.removeIf { (currentTime - it.startTime) > it.duration }
+            }
+            
             ripples.forEach { ripple ->
                 val progress = (currentTime - ripple.startTime).toFloat() / ripple.duration
                 for (i in 0 until 3) {
@@ -218,6 +233,45 @@ fun RippleGame(
             )
         }
 
+        // Pause Button at the bottom
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 32.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Button(
+                onClick = { 
+                    if (!isPaused) {
+                        pausedTime = System.currentTimeMillis()
+                        isPaused = true
+                    } else {
+                        // Adjust ripple start times so they don't skip ahead when unpausing
+                        val pauseDuration = System.currentTimeMillis() - pausedTime
+                        ripples.indices.forEach { i ->
+                            ripples[i] = ripples[i].copy(startTime = ripples[i].startTime + pauseDuration)
+                        }
+                        isPaused = false
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = DarkSurface),
+                border = BorderStroke(1.dp, PrimaryCyber),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.height(48.dp).width(120.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                        contentDescription = if (isPaused) "Resume" else "Pause",
+                        tint = PrimaryCyber,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = if (isPaused) "Resume" else "Pause", color = TextColor, fontSize = 16.sp)
+                }
+            }
+        }
+
         // Top UI Overlay
         Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             // Mode buttons on the left
@@ -225,9 +279,9 @@ fun RippleGame(
                 modifier = Modifier.align(Alignment.TopStart),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                GameModeButton("Chill", gameMode == GameMode.CHILL) { gameMode = GameMode.CHILL }
-                GameModeButton("Medium", gameMode == GameMode.MEDIUM) { gameMode = GameMode.MEDIUM }
-                GameModeButton("Intense", gameMode == GameMode.INTENSE) { gameMode = GameMode.INTENSE }
+                GameModeButton("Chill", gameMode == GameMode.CHILL && !isPaused) { if(!isPaused) gameMode = GameMode.CHILL }
+                GameModeButton("Medium", gameMode == GameMode.MEDIUM && !isPaused) { if(!isPaused) gameMode = GameMode.MEDIUM }
+                GameModeButton("Intense", gameMode == GameMode.INTENSE && !isPaused) { if(!isPaused) gameMode = GameMode.INTENSE }
             }
 
             // Score in the center

@@ -83,6 +83,7 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
     var selectedYear by remember { mutableStateOf(LocalDate.now().year) }
     var searchQuery by remember { mutableStateOf("") }
     var entryToEdit by remember { mutableStateOf<JournalEntry?>(null) }
+    var showGameMenu by remember { mutableStateOf(false) }
     
     // Sort and View states
     var isDescending by remember { mutableStateOf(true) }
@@ -163,11 +164,25 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                 modifier = Modifier.align(Alignment.Center).clickable { showLinksDialog = true },
                 textAlign = TextAlign.Center
             )
-            IconButton(
-                onClick = { showRippleGame = true },
-                modifier = Modifier.align(Alignment.CenterEnd).size(32.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Games, contentDescription = "Ripple Game", tint = PrimaryCyber)
+            Box(modifier = Modifier.align(Alignment.CenterEnd)) {
+                IconButton(onClick = { showGameMenu = true }) {
+                    Icon(imageVector = Icons.Default.Menu, contentDescription = "Game Menu", tint = PrimaryCyber)
+                }
+                DropdownMenu(
+                    expanded = showGameMenu,
+                    onDismissRequest = { showGameMenu = false },
+                    modifier = Modifier.background(DarkSurface)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Ripple Game", color = TextColor) },
+                        onClick = {
+                            showRippleGame = true
+                            showGameMenu = false
+                        },
+                        leadingIcon = { Icon(Icons.Default.Games, contentDescription = null, tint = PrimaryCyber) }
+                    )
+                    // Add future games here
+                }
             }
         }
         
@@ -425,7 +440,7 @@ fun JournalEntryCard(
                             .padding(top = 8.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { onImageClick(entry.imageUri) },
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Fit
                     )
                 }
                 if (entry.documentUri != null) {
@@ -656,7 +671,7 @@ fun JournalEntryDialog(date: LocalDate, entryToEdit: JournalEntry?, onDismiss: (
                                 .fillMaxWidth()
                                 .height(200.dp)
                                 .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Fit
                         )
                         IconButton(
                             onClick = { imageUri = null },
