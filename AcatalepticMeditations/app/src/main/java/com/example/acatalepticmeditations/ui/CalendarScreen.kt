@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
@@ -47,6 +48,9 @@ import com.acataleptic.meditations.ui.theme.*
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdView
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -155,239 +159,263 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
         )
     }
 
-    Column(modifier = modifier.fillMaxSize().background(DarkBackground).padding(16.dp)) {
-        Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-            Text(
-                text = "Acataleptic Meditations",
-                fontSize = 24.sp,
-                color = TextColor,
-                modifier = Modifier.align(Alignment.Center).clickable { showLinksDialog = true },
-                textAlign = TextAlign.Center
-            )
-            Box(modifier = Modifier.align(Alignment.CenterEnd)) {
-                IconButton(onClick = { showGameMenu = true }) {
-                    Icon(imageVector = Icons.Default.Menu, contentDescription = "Game Menu", tint = PrimaryCyber)
-                }
-                DropdownMenu(
-                    expanded = showGameMenu,
-                    onDismissRequest = { showGameMenu = false },
-                    modifier = Modifier.background(DarkSurface)
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Ripple Game", color = TextColor) },
-                        onClick = {
-                            showRippleGame = true
-                            showGameMenu = false
-                        },
-                        leadingIcon = { Icon(Icons.Default.Games, contentDescription = null, tint = PrimaryCyber) }
-                    )
-                    // Add future games here
-                }
-            }
-        }
-        
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            TextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                label = { Text("Search Entries") },
-                modifier = Modifier.weight(1f),
-                colors = TextFieldDefaults.colors(focusedTextColor = TextColor, unfocusedTextColor = TextColor, focusedContainerColor = DarkSurface, unfocusedContainerColor = DarkSurface),
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear Search", tint = TextColor)
-                        }
-                    }
-                }
-            )
-            
-            Spacer(modifier = Modifier.width(8.dp))
-            
-            IconButton(onClick = { isListViewMode = !isListViewMode }) {
-                Icon(
-                    imageVector = if (isListViewMode) Icons.Default.CalendarMonth else Icons.AutoMirrored.Filled.List,
-                    contentDescription = "Toggle View Mode",
-                    tint = PrimaryCyber
+    Scaffold(
+        bottomBar = {
+            AdBanner()
+        },
+        containerColor = DarkBackground
+    ) { innerPadding ->
+        Column(modifier = modifier.fillMaxSize().padding(innerPadding).padding(16.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                Text(
+                    text = "Acataleptic Meditations",
+                    fontSize = 24.sp,
+                    color = TextColor,
+                    modifier = Modifier.align(Alignment.Center).clickable { showLinksDialog = true },
+                    textAlign = TextAlign.Center
                 )
+                Box(modifier = Modifier.align(Alignment.CenterEnd)) {
+                    IconButton(onClick = { showGameMenu = true }) {
+                        Icon(imageVector = Icons.Default.Menu, contentDescription = "Game Menu", tint = PrimaryCyber)
+                    }
+                    DropdownMenu(
+                        expanded = showGameMenu,
+                        onDismissRequest = { showGameMenu = false },
+                        modifier = Modifier.background(DarkSurface)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Ripple Game", color = TextColor) },
+                            onClick = {
+                                showRippleGame = true
+                                showGameMenu = false
+                            },
+                            leadingIcon = { Icon(Icons.Default.Games, contentDescription = null, tint = PrimaryCyber) }
+                        )
+                        // Add future games here
+                    }
+                }
             }
-        }
-
-        if (searchQuery.isBlank()) {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                if (!isListViewMode) {
-                    item {
-                        Column {
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                MonthDropdown(selectedMonth, modifier = Modifier.weight(1f), onMonthSelected = { selectedMonth = it })
-                                YearDropdown(selectedYear, modifier = Modifier.weight(1f), onYearSelected = { selectedYear = it })
-                            }
-                            val daysOfWeek = remember { listOf(DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY) }
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                for (day in daysOfWeek) {
-                                    Text(
-                                        text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
-                                        modifier = Modifier.weight(1f),
-                                        color = TextColor,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            }
-                            CalendarGrid(
-                                selectedDate = selectedDate,
-                                onDayClick = { date -> selectedDate = date },
-                                daysOfWeek = daysOfWeek,
-                                month = selectedMonth,
-                                year = selectedYear,
-                                entries = allJournalEntries
-                            )
-
-                            Box(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
-                                Button(
-                                    onClick = { showDialog = true },
-                                    modifier = Modifier.fillMaxWidth(0.5f),
-                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyber),
-                                    enabled = selectedDate != null
-                                ) {
-                                    Text("New Journal Entry", color = Color.Black)
-                                }
+            
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                TextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Search Entries") },
+                    modifier = Modifier.weight(1f),
+                    colors = TextFieldDefaults.colors(focusedTextColor = TextColor, unfocusedTextColor = TextColor, focusedContainerColor = DarkSurface, unfocusedContainerColor = DarkSurface),
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear Search", tint = TextColor)
                             }
                         }
                     }
+                )
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                IconButton(onClick = { isListViewMode = !isListViewMode }) {
+                    Icon(
+                        imageVector = if (isListViewMode) Icons.Default.CalendarMonth else Icons.AutoMirrored.Filled.List,
+                        contentDescription = "Toggle View Mode",
+                        tint = PrimaryCyber
+                    )
+                }
+            }
 
-                    selectedDate?.let { date ->
-                        val dailyScore = allScores.find { it.date == date }
-                        
+            if (searchQuery.isBlank()) {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    if (!isListViewMode) {
                         item {
-                            Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Journal Entries for ${date.month.name} ${date.dayOfMonth}:",
-                                        color = TextColor,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    IconButton(onClick = { isDescending = !isDescending }, modifier = Modifier.size(24.dp)) {
-                                        Icon(
-                                            imageVector = if (isDescending) Icons.Default.VerticalAlignBottom else Icons.Default.VerticalAlignTop,
-                                            contentDescription = "Change sort order",
-                                            tint = PrimaryCyber,
-                                            modifier = Modifier.size(18.dp)
+                            Column {
+                                Row(modifier = Modifier.fillMaxWidth()) {
+                                    MonthDropdown(selectedMonth, modifier = Modifier.weight(1f), onMonthSelected = { selectedMonth = it })
+                                    YearDropdown(selectedYear, modifier = Modifier.weight(1f), onYearSelected = { selectedYear = it })
+                                }
+                                val daysOfWeek = remember { listOf(DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY) }
+                                Row(modifier = Modifier.fillMaxWidth()) {
+                                    for (day in daysOfWeek) {
+                                        Text(
+                                            text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                                            modifier = Modifier.weight(1f),
+                                            color = TextColor,
+                                            textAlign = TextAlign.Center
                                         )
                                     }
                                 }
-                                if (dailyScore != null && dailyScore.highScore > 0) {
+                                CalendarGrid(
+                                    selectedDate = selectedDate,
+                                    onDayClick = { date -> selectedDate = date },
+                                    daysOfWeek = daysOfWeek,
+                                    month = selectedMonth,
+                                    year = selectedYear,
+                                    entries = allJournalEntries
+                                )
+
+                                Box(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
+                                    Button(
+                                        onClick = { showDialog = true },
+                                        modifier = Modifier.fillMaxWidth(0.5f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyber),
+                                        enabled = selectedDate != null
+                                    ) {
+                                        Text("New Journal Entry", color = Color.Black)
+                                    }
+                                }
+                            }
+                        }
+
+                        selectedDate?.let { date ->
+                            val dailyScore = allScores.find { it.date == date }
+                            
+                            item {
+                                Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Journal Entries for ${date.month.name} ${date.dayOfMonth}:",
+                                            color = TextColor,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        IconButton(onClick = { isDescending = !isDescending }, modifier = Modifier.size(24.dp)) {
+                                            Icon(
+                                                imageVector = if (isDescending) Icons.Default.VerticalAlignBottom else Icons.Default.VerticalAlignTop,
+                                                contentDescription = "Change sort order",
+                                                tint = PrimaryCyber,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                    if (dailyScore != null && dailyScore.highScore > 0) {
+                                        Text(
+                                            text = "Ripple High Score: ${dailyScore.highScore}",
+                                            color = PrimaryCyber,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.padding(top = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            if (sortedJournalEntries.isNotEmpty()) {
+                                items(sortedJournalEntries) { entry ->
+                                    JournalEntryCard(
+                                        entry = entry,
+                                        onEdit = { entryToEdit = it; showDialog = true },
+                                        onDelete = { viewModel.deleteJournalEntry(it) },
+                                        onImageClick = { showFullScreenImage = it }
+                                    )
+                                }
+                            } else {
+                                item {
                                     Text(
-                                        text = "Ripple High Score: ${dailyScore.highScore}",
+                                        text = "No entries for this date.",
+                                        color = TextColor.copy(alpha = 0.5f),
+                                        modifier = Modifier.padding(vertical = 8.dp),
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "All Journal Entries", color = TextColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                                
+                                TextButton(onClick = { isDescending = !isDescending }) {
+                                    Icon(
+                                        imageVector = if (isDescending) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
+                                        contentDescription = null,
+                                        tint = PrimaryCyber,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (isDescending) "Newest First" else "Oldest First",
                                         color = PrimaryCyber,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.padding(top = 4.dp)
+                                        fontSize = 14.sp
                                     )
                                 }
                             }
                         }
                         
-                        if (sortedJournalEntries.isNotEmpty()) {
-                            items(sortedJournalEntries) { entry ->
+                        if (allJournalEntries.isEmpty()) {
+                            item {
+                                Text("You haven't written any entries yet.", color = TextColor.copy(alpha = 0.5f))
+                            }
+                        } else {
+                            items(allJournalEntries) { entry ->
                                 JournalEntryCard(
                                     entry = entry,
+                                    showDate = true,
                                     onEdit = { entryToEdit = it; showDialog = true },
                                     onDelete = { viewModel.deleteJournalEntry(it) },
                                     onImageClick = { showFullScreenImage = it }
                                 )
                             }
-                        } else {
-                            item {
-                                Text(
-                                    text = "No entries for this date.",
-                                    color = TextColor.copy(alpha = 0.5f),
-                                    modifier = Modifier.padding(vertical = 8.dp),
-                                    fontSize = 14.sp
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(text = "All Journal Entries", color = TextColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            
-                            TextButton(onClick = { isDescending = !isDescending }) {
-                                Icon(
-                                    imageVector = if (isDescending) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
-                                    contentDescription = null,
-                                    tint = PrimaryCyber,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (isDescending) "Newest First" else "Oldest First",
-                                    color = PrimaryCyber,
-                                    fontSize = 14.sp
-                                )
-                            }
                         }
                     }
                     
-                    if (allJournalEntries.isEmpty()) {
-                        item {
-                            Text("You haven't written any entries yet.", color = TextColor.copy(alpha = 0.5f))
-                        }
-                    } else {
-                        items(allJournalEntries) { entry ->
-                            JournalEntryCard(
-                                entry = entry,
-                                showDate = true,
-                                onEdit = { entryToEdit = it; showDialog = true },
-                                onDelete = { viewModel.deleteJournalEntry(it) },
-                                onImageClick = { showFullScreenImage = it }
-                            )
-                        }
+                    item {
+                        Spacer(modifier = Modifier.height(32.dp))
+                        Text(
+                            text = "Total App Life Score: $totalAppLifeScore",
+                            color = PrimaryCyber,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
+                        )
                     }
                 }
-                
-                item {
-                    Spacer(modifier = Modifier.height(32.dp))
-                    Text(
-                        text = "Total App Life Score: $totalAppLifeScore",
-                        color = PrimaryCyber,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
-                    )
-                }
-            }
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 16.dp)) {
-                items(searchResults) { entry ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable {
-                            selectedDate = entry.date
-                            selectedMonth = entry.date.month
-                            selectedYear = entry.date.year
-                            searchQuery = ""
-                            isListViewMode = false
-                        },
-                        colors = CardDefaults.cardColors(containerColor = DarkSurface)
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text("${entry.date.monthValue}/${entry.date.dayOfMonth}/${entry.date.year}", color = PrimaryCyber, fontSize = 12.sp)
-                            Text(entry.text, color = TextColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 16.dp)) {
+                    items(searchResults) { entry ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable {
+                                selectedDate = entry.date
+                                selectedMonth = entry.date.month
+                                selectedYear = entry.date.year
+                                searchQuery = ""
+                                isListViewMode = false
+                            },
+                            colors = CardDefaults.cardColors(containerColor = DarkSurface)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("${entry.date.monthValue}/${entry.date.dayOfMonth}/${entry.date.year}", color = PrimaryCyber, fontSize = 12.sp)
+                                Text(entry.text, color = TextColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+fun AdBanner() {
+    AndroidView(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp),
+        factory = { context ->
+            AdView(context).apply {
+                setAdSize(AdSize.BANNER)
+                // This is a test ad unit ID. Replace with your production ID later.
+                adUnitId = "ca-app-pub-3940256099942544/6300978111"
+                loadAd(AdRequest.Builder().build())
+            }
+        }
+    )
 }
 
 @Composable

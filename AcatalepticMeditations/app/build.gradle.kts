@@ -69,6 +69,7 @@ dependencies {
     ksp("androidx.room:room-compiler:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("com.google.android.gms:play-services-ads:23.3.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

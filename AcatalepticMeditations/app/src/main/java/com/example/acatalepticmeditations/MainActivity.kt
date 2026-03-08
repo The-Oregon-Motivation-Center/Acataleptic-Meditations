@@ -14,6 +14,7 @@ import com.acataleptic.meditations.ui.CalendarScreen
 import com.acataleptic.meditations.ui.JournalViewModel
 import com.acataleptic.meditations.ui.JournalViewModelFactory
 import com.acataleptic.meditations.ui.theme.AcatalepticMeditationsTheme
+import com.google.android.gms.ads.MobileAds
 
 class MainActivity : ComponentActivity() {
     private val database by lazy { AppDatabase.getDatabase(this) }
@@ -23,6 +24,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialize Mobile Ads SDK
+        MobileAds.initialize(this) {}
+        
         enableEdgeToEdge()
         setContent {
             AcatalepticMeditationsTheme {
