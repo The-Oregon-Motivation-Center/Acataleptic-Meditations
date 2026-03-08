@@ -118,7 +118,7 @@ fun RippleGame(
         val maxWidth = constraints.maxWidth.toFloat()
         val maxHeight = constraints.maxHeight.toFloat()
         val topReservedHeight = 160f * density 
-        val bottomReservedHeight = 80f * density // Increased to accommodate pause button
+        val bottomReservedHeight = 120f * density // Increased further to prevent dots overlapping with the higher pause button
 
         // Manage dots based on game mode
         LaunchedEffect(gameMode, maxWidth, maxHeight, isPaused) {
@@ -216,7 +216,7 @@ fun RippleGame(
         // Render all dots
         dots.forEach { dot ->
             val dotAlpha by animateFloatAsState(
-                targetValue = if (dot.isVisible) 1f else 0f,
+                targetValue = if (dot.isVisible && !isPaused) 1f else 0f,
                 animationSpec = tween(durationMillis = 250),
                 label = "dotAlpha_${dot.id}"
             )
@@ -233,14 +233,14 @@ fun RippleGame(
             )
         }
 
-        // Pause Button at the bottom
+        // Pause Button - Moved to the right side, just an icon, and higher up
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 32.dp),
-            contentAlignment = Alignment.BottomCenter
+                .padding(bottom = 64.dp, end = 24.dp), // Raised and padded from right
+            contentAlignment = Alignment.BottomEnd
         ) {
-            Button(
+            IconButton(
                 onClick = { 
                     if (!isPaused) {
                         pausedTime = System.currentTimeMillis()
@@ -254,21 +254,17 @@ fun RippleGame(
                         isPaused = false
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = DarkSurface),
-                border = BorderStroke(1.dp, PrimaryCyber),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.height(48.dp).width(120.dp)
+                modifier = Modifier
+                    .size(56.dp)
+                    .background(DarkSurface, CircleShape)
+                    .border(BorderStroke(1.dp, PrimaryCyber), CircleShape)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                        contentDescription = if (isPaused) "Resume" else "Pause",
-                        tint = PrimaryCyber,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = if (isPaused) "Resume" else "Pause", color = TextColor, fontSize = 16.sp)
-                }
+                Icon(
+                    imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                    contentDescription = if (isPaused) "Resume" else "Pause",
+                    tint = PrimaryCyber,
+                    modifier = Modifier.size(32.dp)
+                )
             }
         }
 
