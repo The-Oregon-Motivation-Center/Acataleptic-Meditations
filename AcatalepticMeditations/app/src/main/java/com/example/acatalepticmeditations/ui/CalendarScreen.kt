@@ -2,6 +2,7 @@ package com.acataleptic.meditations.ui
 
 import android.Manifest
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -91,6 +93,9 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
     var entryToEdit by remember { mutableStateOf<JournalEntry?>(null) }
     var showGameMenu by remember { mutableStateOf(false) }
     
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     // Sort and View states
     var isDescending by remember { mutableStateOf(true) }
     var isListViewMode by remember { mutableStateOf(false) }
@@ -262,104 +267,119 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
                                 YearDropdown(selectedYear, modifier = Modifier.weight(1f), onYearSelected = { selectedYear = it })
                             }
                             val daysOfWeek = remember { listOf(DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY) }
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                for (day in daysOfWeek) {
-                                    Text(
-                                        text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
-                                        modifier = Modifier.weight(1f),
-                                        color = TextColor,
-                                        textAlign = TextAlign.Center
-                                    )
+                            
+                            // Optimization for Landscape: Use a Row with Calendar on left and Score/Buttons on right
+                            if (isLandscape) {
+                                Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                                    Column(modifier = Modifier.weight(1.2f)) {
+                                        CalendarGridContent(daysOfWeek, selectedDate, selectedMonth, selectedYear, allJournalEntries) { selectedDate = it }
+                                    }
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Column(modifier = Modifier.weight(0.8f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Button(
+                                            onClick = { showDialog = true },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyber),
+                                            enabled = selectedDate != null
+                                        ) {
+                                            Text("New Journal Entry", color = Color.Black)
+                                        }
+                                        
+                                        selectedDate?.let { date ->
+                                            val dailyScore = allScores.find { it.date == date }
+                                            ScoreDisplay(dailyScore)
+                                        }
+                                    }
                                 }
-                            }
-                            CalendarGrid(
-                                selectedDate = selectedDate,
-                                onDayClick = { date -> selectedDate = date },
-                                daysOfWeek = daysOfWeek,
-                                month = selectedMonth,
-                                year = selectedYear,
-                                entries = allJournalEntries
-                            )
+                            } else {
+                                // Original Portrait Layout
+                                CalendarGridContent(daysOfWeek, selectedDate, selectedMonth, selectedYear, allJournalEntries) { selectedDate = it }
 
-                            Box(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
-                                Button(
-                                    onClick = { showDialog = true },
-                                    modifier = Modifier.fillMaxWidth(0.5f),
-                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyber),
-                                    enabled = selectedDate != null
-                                ) {
-                                    Text("New Journal Entry", color = Color.Black)
+                                Box(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
+                                    Button(
+                                        onClick = { showDialog = true },
+                                        modifier = Modifier.fillMaxWidth(0.5f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyber),
+                                        enabled = selectedDate != null
+                                    ) {
+                                        Text("New Journal Entry", color = Color.Black)
+                                    }
                                 }
                             }
                         }
                     }
 
-                    selectedDate?.let { date ->
-                        val dailyScore = allScores.find { it.date == date }
-                        
-                        item {
-                            Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
+                    if (!isLandscape) {
+                        selectedDate?.let { date ->
+                            val dailyScore = allScores.find { it.date == date }
+                            item {
+                                Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Journal Entries for ${date.month.name} ${date.dayOfMonth}:",
+                                            color = TextColor,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        IconButton(onClick = { isDescending = !isDescending }, modifier = Modifier.size(24.dp)) {
+                                            Icon(
+                                                imageVector = if (isDescending) Icons.Default.VerticalAlignBottom else Icons.Default.VerticalAlignTop,
+                                                contentDescription = "Change sort order",
+                                                tint = PrimaryCyber,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                    ScoreDisplay(dailyScore)
+                                }
+                            }
+                        }
+                    } else {
+                        // Landscape specific header for entries
+                        selectedDate?.let { date ->
+                            item {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Journal Entries for ${date.month.name} ${date.dayOfMonth}:",
+                                        text = "Entries for ${date.month.name} ${date.dayOfMonth}:",
                                         color = TextColor,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    IconButton(onClick = { isDescending = !isDescending }, modifier = Modifier.size(24.dp)) {
+                                    IconButton(onClick = { isDescending = !isDescending }) {
                                         Icon(
                                             imageVector = if (isDescending) Icons.Default.VerticalAlignBottom else Icons.Default.VerticalAlignTop,
                                             contentDescription = "Change sort order",
-                                            tint = PrimaryCyber,
-                                            modifier = Modifier.size(18.dp)
+                                            tint = PrimaryCyber
                                         )
-                                    }
-                                }
-                                if (dailyScore != null) {
-                                    Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                                        if (dailyScore.rippleHighScore > 0) {
-                                            Text(
-                                                text = "Ripple High: ${dailyScore.rippleHighScore}",
-                                                color = PrimaryCyber,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                modifier = Modifier.padding(end = 16.dp)
-                                            )
-                                        }
-                                        if (dailyScore.tracerHighScore > 0) {
-                                            Text(
-                                                text = "Tracer High: ${dailyScore.tracerHighScore}",
-                                                color = SecondaryCyber,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        }
                                     }
                                 }
                             }
                         }
-                        
-                        if (sortedJournalEntries.isNotEmpty()) {
-                            items(sortedJournalEntries) { entry ->
-                                JournalEntryCard(
-                                    entry = entry,
-                                    onEdit = { entryToEdit = it; showDialog = true },
-                                    onDelete = { viewModel.deleteJournalEntry(it) },
-                                    onImageClick = { showFullScreenImage = it }
-                                )
-                            }
-                        } else {
-                            item {
-                                Text(
-                                    text = "No entries for this date.",
-                                    color = TextColor.copy(alpha = 0.5f),
-                                    modifier = Modifier.padding(vertical = 8.dp),
-                                    fontSize = 14.sp
-                                )
-                            }
+                    }
+                    
+                    if (sortedJournalEntries.isNotEmpty()) {
+                        items(sortedJournalEntries) { entry ->
+                            JournalEntryCard(
+                                entry = entry,
+                                onEdit = { entryToEdit = it; showDialog = true },
+                                onDelete = { viewModel.deleteJournalEntry(it) },
+                                onImageClick = { showFullScreenImage = it }
+                            )
+                        }
+                    } else {
+                        item {
+                            Text(
+                                text = "No entries for this date.",
+                                color = TextColor.copy(alpha = 0.5f),
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                fontSize = 14.sp
+                            )
                         }
                     }
                 } else {
@@ -452,6 +472,60 @@ private fun CalendarView(modifier: Modifier, viewModel: JournalViewModel) {
             }
         }
     }
+}
+
+@Composable
+private fun ScoreDisplay(dailyScore: com.acataleptic.meditations.data.DailyScore?) {
+    if (dailyScore != null) {
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+            if (dailyScore.rippleHighScore > 0) {
+                Text(
+                    text = "Ripple High: ${dailyScore.rippleHighScore}",
+                    color = PrimaryCyber,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(end = 16.dp)
+                )
+            }
+            if (dailyScore.tracerHighScore > 0) {
+                Text(
+                    text = "Tracer High: ${dailyScore.tracerHighScore}",
+                    color = SecondaryCyber,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarGridContent(
+    daysOfWeek: List<DayOfWeek>,
+    selectedDate: LocalDate?,
+    month: Month,
+    year: Int,
+    entries: List<JournalEntry>,
+    onDayClick: (LocalDate) -> Unit
+) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        for (day in daysOfWeek) {
+            Text(
+                text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                modifier = Modifier.weight(1f),
+                color = TextColor,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+    CalendarGrid(
+        selectedDate = selectedDate,
+        onDayClick = onDayClick,
+        daysOfWeek = daysOfWeek,
+        month = month,
+        year = year,
+        entries = entries
+    )
 }
 
 @Composable

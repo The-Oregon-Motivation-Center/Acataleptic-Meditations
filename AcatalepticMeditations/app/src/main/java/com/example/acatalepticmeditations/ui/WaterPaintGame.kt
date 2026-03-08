@@ -1,5 +1,17 @@
 package com.acataleptic.meditations.ui
 
+import android.content.ContentValues
+import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.media.MediaPlayer
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -14,6 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.*
@@ -25,12 +39,15 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.acataleptic.meditations.ui.theme.*
+import java.io.OutputStream
 
 data class PaintPath(
     val path: Path,
@@ -48,6 +65,7 @@ fun WaterPaintGame(onExit: () -> Unit) {
     var isAutomaticMode by remember { mutableStateOf(true) }
     var selectedColor by remember { mutableStateOf(Color(0xFF00E5FF)) }
     var autoHue by remember { mutableFloatStateOf(0f) }
+    var isMusicPlaying by remember { mutableStateOf(true) }
 
     val vibrantColors = listOf(
         Color(0xFF00E5FF), // Cyan
@@ -60,7 +78,34 @@ fun WaterPaintGame(onExit: () -> Unit) {
         Color(0xFF7B61FF)  // Purple
     )
 
-    Box(modifier = Modifier.fillMaxSize().background(DarkBackground)) {
+    // Music Setup
+    val mediaPlayer = remember {
+        val songNames = listOf("chasm", "desert_oasis", "tranquil_sea", "frozen_caverns")
+        val songName = songNames.random()
+        val resId = context.resources.getIdentifier(songName, "raw", context.packageName)
+        if (resId != 0) {
+            MediaPlayer.create(context, resId).apply { isLooping = true }
+        } else {
+            null
+        }
+    }
+
+    DisposableEffect(Unit) {
+        if (isMusicPlaying) mediaPlayer?.start()
+        onDispose {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+        }
+    }
+
+    LaunchedEffect(isMusicPlaying) {
+        if (isMusicPlaying) mediaPlayer?.start() else mediaPlayer?.pause()
+    }
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize().background(DarkBackground)) {
+        val maxWidth = constraints.maxWidth.toFloat()
+        val maxHeight = constraints.maxHeight.toFloat()
+
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -79,7 +124,6 @@ fun WaterPaintGame(onExit: () -> Unit) {
                                 selectedColor
                             }
 
-                            // To make it look like "water" flows, we commit small segments
                             currentPath?.let {
                                 paths.add(PaintPath(it, paintColor))
                                 currentPath = Path().apply { moveTo(change.position.x, change.position.y) }
@@ -109,8 +153,17 @@ fun WaterPaintGame(onExit: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Water Paint", color = PrimaryCyber, fontSize = 20.sp)
-                IconButton(onClick = onExit) {
-                    Icon(Icons.Default.Close, contentDescription = "Exit", tint = TextColor)
+                Row {
+                    IconButton(onClick = { isMusicPlaying = !isMusicPlaying }) {
+                        Icon(
+                            imageVector = if (isMusicPlaying) Icons.Default.MusicNote else Icons.Default.MusicOff,
+                            contentDescription = "Toggle Music",
+                            tint = TextColor
+                        )
+                    }
+                    IconButton(onClick = onExit) {
+                        Icon(Icons.Default.Close, contentDescription = "Exit", tint = TextColor)
+                    }
                 }
             }
 
@@ -167,7 +220,7 @@ fun WaterPaintGame(onExit: () -> Unit) {
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 64.dp), // Higher to clear ads/system bar
+                .padding(bottom = 64.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             FloatingActionButton(
@@ -182,7 +235,7 @@ fun WaterPaintGame(onExit: () -> Unit) {
 
             FloatingActionButton(
                 onClick = {
-                    Toast.makeText(context, "Image saved to your meditations!", Toast.LENGTH_SHORT).show()
+                    saveBitmapToGallery(context, paths.toList(), maxWidth.toInt(), maxHeight.toInt())
                 },
                 containerColor = DarkSurface,
                 contentColor = PrimaryCyber,
@@ -192,5 +245,57 @@ fun WaterPaintGame(onExit: () -> Unit) {
                 Icon(Icons.Default.PhotoCamera, contentDescription = "Screenshot")
             }
         }
+    }
+}
+
+private fun saveBitmapToGallery(context: android.content.Context, paths: List<PaintPath>, width: Int, height: Int) {
+    if (width <= 0 || height <= 0) return
+    try {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = AndroidCanvas(bitmap)
+        canvas.drawColor(DarkBackground.toArgb())
+
+        val paint = Paint().apply {
+            strokeWidth = 50f
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            isAntiAlias = true
+            // Use Screen blending mode to match the UI
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
+        }
+
+        paths.forEach { paintPath ->
+            paint.color = paintPath.color.copy(alpha = paintPath.alpha).toArgb()
+            canvas.drawPath(paintPath.path.asAndroidPath(), paint)
+        }
+
+        val filename = "Acataleptic_Paint_${System.currentTimeMillis()}.png"
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Acataleptic")
+            }
+        }
+
+        val contentResolver = context.contentResolver
+        val imageUri: Uri? = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+
+        imageUri?.let {
+            val fos: OutputStream? = contentResolver.openOutputStream(it)
+            if (fos != null) {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
+                fos.flush()
+                fos.close()
+                Toast.makeText(context, "Saved to Gallery!", Toast.LENGTH_SHORT).show()
+            }
+        } ?: run {
+            Toast.makeText(context, "Failed to create MediaStore entry", Toast.LENGTH_SHORT).show()
+        }
+        
+        bitmap.recycle()
+    } catch (e: Exception) {
+        Log.e("WaterPaint", "Error saving image", e)
+        Toast.makeText(context, "Error saving image: ${e.message}", Toast.LENGTH_SHORT).show()
     }
 }

@@ -3,14 +3,19 @@ package com.acataleptic.meditations.ui
 import android.media.MediaPlayer
 import android.util.Log
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MusicOff
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,6 +56,8 @@ fun TracerGame(
     val dailyScore by viewModel.getScoreForDate(today).collectAsState(initial = null)
     val density = LocalDensity.current.density
     var isMusicPlaying by remember { mutableStateOf(true) }
+    var isPaused by remember { mutableStateOf(false) }
+    var pausedTime by remember { mutableLongStateOf(0L) }
 
     val gameColors = listOf(
         PrimaryCyber, SecondaryCyber, Color.Yellow, Color.Green, 
@@ -78,8 +85,8 @@ fun TracerGame(
     }
 
     // Music control
-    LaunchedEffect(isMusicPlaying) {
-        if (isMusicPlaying) mediaPlayer?.start() else mediaPlayer?.pause()
+    LaunchedEffect(isMusicPlaying, isPaused) {
+        if (isMusicPlaying && !isPaused) mediaPlayer?.start() else mediaPlayer?.pause()
     }
 
     // Continuous redraw ticker
@@ -101,7 +108,8 @@ fun TracerGame(
 
         Canvas(modifier = Modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
+            .pointerInput(isPaused) {
+                if (isPaused) return@pointerInput
                 detectTapGestures { offset ->
                     val randomColor = gameColors.random()
                     targets.add(offset to randomColor)
@@ -111,19 +119,21 @@ fun TracerGame(
             }) {
             // Read ticker to force redraw every frame
             val _t = ticker 
-            val currentTime = System.currentTimeMillis()
+            val currentTime = if (isPaused) pausedTime else System.currentTimeMillis()
             
             // Update and Draw Sparks
             val sparksToRemove = mutableListOf<Spark>()
             sparks.forEach { spark ->
                 val progress = (currentTime - spark.startTime).toFloat() / spark.duration
                 if (progress >= 1f) {
-                    sparksToRemove.add(spark)
-                    val targetColor = gameColors.random()
-                    ripples.add(Ripple(spark.target, spark.color, targetColor, currentTime))
-                    targets.removeAll { it.first == spark.target }
-                    score++
-                    viewModel.incrementTracerScore(today, score)
+                    if (!isPaused) {
+                        sparksToRemove.add(spark)
+                        val targetColor = gameColors.random()
+                        ripples.add(Ripple(spark.target, spark.color, targetColor, currentTime))
+                        targets.removeAll { it.first == spark.target }
+                        score++
+                        viewModel.incrementTracerScore(today, score)
+                    }
                 } else {
                     val currentPos = Offset(
                         spark.position.x + (spark.target.x - spark.position.x) * progress,
@@ -148,10 +158,14 @@ fun TracerGame(
                     }
                 }
             }
-            sparks.removeAll(sparksToRemove)
+            if (!isPaused) {
+                sparks.removeAll(sparksToRemove)
+            }
 
             // Update and Draw Ripples
-            ripples.removeIf { (currentTime - it.startTime) > it.duration }
+            if (!isPaused) {
+                ripples.removeIf { (currentTime - it.startTime) > it.duration }
+            }
             ripples.forEach { ripple ->
                 val progress = (currentTime - ripple.startTime).toFloat() / ripple.duration
                 for (i in 0 until 2) {
@@ -176,6 +190,45 @@ fun TracerGame(
                     color = color.copy(alpha = 0.3f),
                     radius = 10.dp.toPx(),
                     center = target
+                )
+            }
+        }
+
+        // Pause Button
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 64.dp, end = 24.dp),
+            contentAlignment = Alignment.BottomEnd
+        ) {
+            IconButton(
+                onClick = { 
+                    if (!isPaused) {
+                        pausedTime = System.currentTimeMillis()
+                        isPaused = true
+                    } else {
+                        val pauseDuration = System.currentTimeMillis() - pausedTime
+                        // Adjust spark start times
+                        sparks.indices.forEach { i ->
+                            sparks[i] = sparks[i].copy(startTime = sparks[i].startTime + pauseDuration)
+                        }
+                        // Adjust ripple start times
+                        ripples.indices.forEach { i ->
+                            ripples[i] = ripples[i].copy(startTime = ripples[i].startTime + pauseDuration)
+                        }
+                        isPaused = false
+                    }
+                },
+                modifier = Modifier
+                    .size(56.dp)
+                    .background(DarkSurface, CircleShape)
+                    .border(BorderStroke(1.dp, PrimaryCyber), CircleShape)
+            ) {
+                Icon(
+                    imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                    contentDescription = if (isPaused) "Resume" else "Pause",
+                    tint = PrimaryCyber,
+                    modifier = Modifier.size(32.dp)
                 )
             }
         }
