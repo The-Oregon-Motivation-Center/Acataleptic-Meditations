@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew assembleRelease)",
+      "Read(//c/Program Files/Android/Android Studio/jbr/**)",
+      "Read(//c/Program Files/Android/Android Studio/**)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio1/jbr\" ./gradlew bundleRelease)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio1/jbr\" \"C:/Program Files/Android/Android Studio1/jbr/bin/keytool\" -list -keystore \"C:/Users/Acata/AndroidStudioProjects/Acat the app.jks\" -storepass \"Penultimate1\" 2>&1)",
+      "Bash(./gradlew compileDebugKotlin)",
+      "Read(//c//**)",
+      "Bash(where java:*)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew compileDebugKotlin)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew compileDebugKotlin)",
+      "Bash(./gradlew assembleDebug)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew assembleDebug)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio1/jbr\" ./gradlew assembleDebug)"
+    ]
+  }
+}
